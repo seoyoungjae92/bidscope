@@ -27,11 +27,17 @@ export function dday(clseDt, now = new Date()) {
 
 /** 조건을 한 줄로. 목록에서 뭘 등록했는지 바로 보여야 한다. */
 export function conditionSummary(c) {
-  const parts = [c.mid_clsfc || c.lrg_clsfc || c.keyword];
+  const parts = [(c.mid_clsfc || c.lrg_clsfc) ? clsfcName(c.mid_clsfc || c.lrg_clsfc) : c.keyword];
   if (c.amt_max > 0 && c.amt_min > 0) parts.push(`${money(c.amt_min)}~${money(c.amt_max)}`);
   else if (c.amt_max > 0) parts.push(`${money(c.amt_max)} 이하`);
   else if (c.amt_min > 0) parts.push(`${money(c.amt_min)} 이상`);
   if (c.cntrct_mthd) parts.push(c.cntrct_mthd);
   if (c.keyword && (c.lrg_clsfc || c.mid_clsfc)) parts.push(`"${c.keyword}"`);
   return parts.filter(Boolean).join(' · ');
+}
+
+/** 분류명 표시용 정리. 원본에 '*' 구분자와 앞뒤 공백이 섞여 온다.
+ *  예: " 여행*숙박*음식*운송 및 보험서비스" → "여행·숙박·음식·운송 및 보험서비스" */
+export function clsfcName(name) {
+  return (name || '기타').trim().replace(/\s*\*\s*/g, '·');
 }

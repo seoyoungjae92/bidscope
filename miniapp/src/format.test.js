@@ -1,6 +1,6 @@
 /** 표시 포맷 자체 점검.  node src/format.test.js */
 import assert from 'node:assert/strict';
-import { conditionSummary, dday, money } from './format.js';
+import { clsfcName, conditionSummary, dday, money } from './format.js';
 
 // money — 억/만 경계
 assert.equal(money(0), '금액 미공개');
@@ -38,4 +38,12 @@ assert.equal(
   'ICT 서비스 · 수의계약 · "홈페이지"');
 assert.equal(conditionSummary({ keyword: '청소' }), '청소');  // 키워드만일 땐 중복 안 함
 
-console.log('통과. money 8 · dday 9 · summary 4');
+// clsfcName — 원본 표기 정리
+assert.equal(clsfcName(' 여행*숙박*음식*운송 및 보험서비스'), '여행·숙박·음식·운송 및 보험서비스');
+assert.equal(clsfcName('매체제작, 디자인, 홍보/마케팅 서비스'), '매체제작, 디자인, 홍보/마케팅 서비스');
+assert.equal(clsfcName(null), '기타');
+assert.equal(clsfcName(''), '기타');
+assert.equal(clsfcName('교육서비스 '), '교육서비스');
+assert.equal(conditionSummary({ lrg_clsfc: '임대*위탁 및 수리서비스' }), '임대·위탁 및 수리서비스');
+
+console.log('통과. money 8 · dday 9 · summary 5 · clsfc 5');

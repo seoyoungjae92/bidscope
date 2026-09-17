@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Device, Notification } from '@apps-in-toss/web-framework';
 import * as api from './api';
 import Banner from './Banner';
-import { conditionSummary, dday, money } from './format';
+import { clsfcName, conditionSummary, dday, money } from './format';
 import './App.css';
 
 const AMOUNTS = [
@@ -219,7 +219,7 @@ function NewCondition({ first, onDone, onCancel }) {
               className={lrg === t.name ? 'chip on' : 'chip'}
               onClick={() => { setLrg(t.name); setMid(null); }}
             >
-              {t.name.trim()}
+              {clsfcName(t.name)}
             </button>
           ))}
         </div>
@@ -235,7 +235,7 @@ function NewCondition({ first, onDone, onCancel }) {
                 className={mid === c.name ? 'chip on' : 'chip'}
                 onClick={() => setMid(mid === c.name ? null : c.name)}
               >
-                {(c.name || '기타').trim()} <span className="dim">{c.count}</span>
+                {clsfcName(c.name)} <span className="dim">{c.count}</span>
               </button>
             ))}
           </div>

@@ -49,6 +49,12 @@ sudo mkdir -p /opt/bidnote && sudo chown $USER /opt/bidnote
 cd /opt/bidnote && python3 db.py
 ```
 
+로컬에서 미니앱과 붙일 때는 CORS 오리진을 열어야 한다:
+```bash
+ALLOW_ORIGINS=http://localhost:5180 PORT=8000 python3 api.py
+```
+**운영에서는 비워둔다** — 기본값으로 localhost를 열어두면 배포 후에도 열린 채 남는다.
+
 **환경변수** `/etc/bidnote.env` (권한 `640`, root:$USER)
 ```
 G2B_KEY=디코딩_인증키

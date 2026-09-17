@@ -28,7 +28,7 @@ section h2 { margin: 0 0 10px; font-size: 15px; font-weight: 600; }
 .row-head { display: flex; justify-content: space-between; align-items: baseline; }
 
 .dim { color: var(--dim); font-size: 13px; }
-.pad { padding: 4px 0 8px; }
+.pad { padding: 2px 0 12px; margin: 0; }
 .error {
   background: #fff3f3; color: #d92e2e; padding: 10px 12px;
   border-radius: 10px; font-size: 13px; margin: 0 0 16px;
@@ -82,6 +82,9 @@ section h2 { margin: 0 0 10px; font-size: 15px; font-weight: 600; }
   display: block; width: 100%; padding: 15px; border-radius: 12px;
   background: var(--blue); color: #fff; font-size: 16px; font-weight: 600;
 }
+/* 본문 흐름에 놓인 CTA는 앞뒤로 숨 쉴 자리가 필요하다.
+   (하단 고정 .bottom 안의 CTA는 아래 규칙이 덮어쓴다) */
+.page > .cta { margin: 4px 0 32px; }
 .cta:disabled { background: var(--line); color: var(--dim); }
 .ghost { padding: 15px 20px; color: var(--dim); font-size: 16px; }
 .bottom {
@@ -91,7 +94,7 @@ section h2 { margin: 0 0 10px; font-size: 15px; font-weight: 600; }
   background: var(--bg); border-top: 1px solid var(--line);
   max-width: 520px; margin: 0 auto;
 }
-.bottom .cta { flex: 1; }
+.bottom .cta { flex: 1; margin: 0; }
 
 /* 광고 — 버튼과 충분히 띄운다(오탭 유도 금지) */
 .banner { margin: 28px 0 8px; min-height: 96px; }

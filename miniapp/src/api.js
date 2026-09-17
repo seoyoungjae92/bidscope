@@ -5,13 +5,20 @@ const BASE = import.meta.env.VITE_API_BASE ?? 'http://localhost:8000';
 
 let keyPromise = null;
 
-/** 익명키는 앱 삭제·기기 변경에도 유지된다. 한 번만 받아서 재사용. */
+/** 익명키는 앱 삭제·기기 변경에도 유지된다. 한 번만 받아서 재사용.
+ *
+ * 토스 앱 밖(브라우저)에서는 SDK가 Promise를 거절하는 게 아니라
+ * 동기적으로 던진다. .catch()로는 안 잡혀서 async 함수로 감싼다. */
 function tossKey() {
   if (!keyPromise) {
-    keyPromise = User.getAnonymousKey()
-      .then((r) => r?.hash ?? r)
-      // 브라우저(AIT Devtools)에서는 SDK가 없다. 개발용 고정 키로 대체.
-      .catch(() => 'dev-local-key');
+    keyPromise = (async () => {
+      try {
+        const r = await User.getAnonymousKey();
+        return r?.hash ?? r;
+      } catch {
+        return 'dev-local-key';   // 개발용 고정 키
+      }
+    })();
   }
   return keyPromise;
 }

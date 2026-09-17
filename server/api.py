@@ -20,6 +20,9 @@ ORIGINS = [
     f"https://{APP_NAME}.apps.tossmini.com",
     f"https://{APP_NAME}.private-apps.tossmini.com",
 ]
+# 로컬 개발용 오리진. 운영에서는 비워둔다 —
+# 기본값으로 localhost를 열어두면 배포 후에도 그대로 열린 채로 남는다.
+ORIGINS += [o for o in os.environ.get("ALLOW_ORIGINS", "").split(",") if o.strip()]
 FREE_CONDITIONS = 3
 WORK_TYPES = {"용역", "물품", "공사", "외자"}
 
