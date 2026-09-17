@@ -60,6 +60,7 @@ section h2 { margin: 0 0 10px; font-size: 15px; font-weight: 600; }
   background: var(--line); padding: 3px 8px; border-radius: 6px;
 }
 .badge.urgent { color: #fff; background: #f04452; }
+.badge.pre { color: #1b64da; background: #e8f3ff; }
 .amt { font-size: 14px; font-weight: 600; color: var(--blue); }
 .notice .title {
   font-size: 15px; font-weight: 500; margin-bottom: 4px;

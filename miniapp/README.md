@@ -1,10 +1,10 @@
-# 입찰알리미 미니앱
+# 입찰레이더 미니앱
 
 토스 앱인토스 WebView 미니앱. Vite + React 19 + `@apps-in-toss/web-framework` 3.4.1.
 
 ```
 src/
-  App.jsx        화면 2개 (조건 등록 / 공고 목록)
+  App.jsx        화면 2개 (조건 등록 / 공고 예고·공고 목록)
   api.js         서버 호출. 익명키를 X-Toss-Key 헤더로
   format.js      금액·D-day·조건 요약 포맷
   format.test.js 포맷 로직 점검 (node만 있으면 돌아감)
@@ -17,7 +17,7 @@ apps-in-toss.config.ts   appName·브랜드 컬러·번들 경로
 npm install
 npm test                 # 포맷 로직 점검
 npm run dev              # 브라우저에서 개발 (AIT Devtools)
-npm run build            # vite build && ait build → bidalarm.ait
+npm run build            # vite build && ait build → bidscope.ait
 ```
 
 서버 주소는 `.env`로:
@@ -31,6 +31,8 @@ VITE_API_BASE=https://api.example.com
 **조건 등록** — 조건이 하나도 없으면 첫 화면이 여기다.
 분야(대분류) → 세부 분야(중분류) → 사업 규모 → 계약 방법을 칩으로 고른다.
 분류 목록은 서버가 **실제 공고에 존재하는 것만** 내려주므로 빈 분류를 고를 일이 없다.
+
+**공고 예고** — 사전규격. 공고보다 중앙값 7일 먼저 뜬다. 목록 맨 위에 둔다 — 차별화가 여기 있다.
 
 **공고 목록** — 내 조건 + 매칭된 공고. 마감 임박순.
 공고를 누르면 `Device.openURL()`로 나라장터 원문이 열린다.

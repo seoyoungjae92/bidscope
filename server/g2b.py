@@ -18,6 +18,12 @@ from datetime import datetime, timedelta
 import db
 
 BASE = "http://apis.data.go.kr/1230000/ad/BidPublicInfoService"
+SPEC_BASE = "http://apis.data.go.kr/1230000/ao/HrcspSsstndrdInfoService"
+SPEC_OPS = {
+    "용역": "getPublicPrcureThngInfoServc",
+    "물품": "getPublicPrcureThngInfoThng",
+    "공사": "getPublicPrcureThngInfoCnstwk",
+}
 OPS = {
     "용역": "getBidPblancListInfoServcPPSSrch",
     "물품": "getBidPblancListInfoThngPPSSrch",
@@ -31,6 +37,11 @@ ROWS = 300          # 페이지당. 일 400여건이라 넉넉하다
 MAX_PAGES = 20      # 안전장치: 백필 폭주 방지
 BACKFILL_DAYS = 3   # 커서가 없을 때 처음 긁을 기간
 
+# 푸시 피로 방지. 실측상 넓은 조건은 일 180건까지 나온다(VERIFIED.md).
+DAILY_CAP = 20
+# 마감 임박 알림 창. 좁으면 준비할 시간이 없고, 넓으면 잊는다.
+CLOSING_MIN_H, CLOSING_MAX_H = 6, 48
+
 
 def _key():
     k = os.environ.get("G2B_KEY")
@@ -39,14 +50,14 @@ def _key():
     return k
 
 
-def fetch(op, bgn, end, page, key):
+def fetch(op, bgn, end, page, key, base=None):
     """한 페이지 조회. (items, total) 반환."""
     q = {
         "ServiceKey": key, "type": "json", "inqryDiv": "1",
         "inqryBgnDt": bgn, "inqryEndDt": end,
         "pageNo": str(page), "numOfRows": str(ROWS),
     }
-    url = f"{BASE}/{op}?" + urllib.parse.urlencode(q, quote_via=urllib.parse.quote)
+    url = f"{base or BASE}/{op}?" + urllib.parse.urlencode(q, quote_via=urllib.parse.quote)
     for attempt in range(3):
         try:
             with urllib.request.urlopen(url, timeout=30) as r:
@@ -149,6 +160,124 @@ def collect(con, key):
     return inserted
 
 
+def collect_prespec(con, key):
+    """사전규격 수집. 공고보다 중앙값 7일 먼저 뜬다.
+
+    커서는 공고와 따로 둔다(work_type에 접미사). 한쪽이 실패해도
+    다른 쪽 커서가 잘못 전진하지 않는다.
+    """
+    now = datetime.now()
+    end = now.strftime("%Y%m%d%H%M")
+    total_got = 0
+
+    for wt in ACTIVE_TYPES:
+        op = SPEC_OPS.get(wt)
+        if not op:
+            continue
+        ck = wt + ":spec"
+        cur = con.execute("select last_dt from cursor where work_type=?", (ck,)).fetchone()
+        bgn = cur["last_dt"] if cur else (now - timedelta(days=BACKFILL_DAYS)).strftime("%Y%m%d%H%M")
+        if bgn >= end:
+            continue
+
+        page, got, total = 1, 0, None
+        while page <= MAX_PAGES:
+            items, total = fetch(op, bgn, end, page, key, base=SPEC_BASE)
+            if not items:
+                break
+            rows = []
+            for i in items:
+                no = (i.get("bfSpecRgstNo") or "").strip()
+                if not no:
+                    continue
+                rows.append((
+                    no, wt, i.get("prdctClsfcNoNm") or "", i.get("orderInsttNm"),
+                    i.get("bsnsDivNm"), 1 if i.get("swBizObjYn") == "Y" else 0,
+                    _amt(i.get("asignBdgtAmt")), _dt(i.get("rgstDt")),
+                    _dt(i.get("opninRgstClseDt")),
+                    (i.get("bidNtceNoList") or "").strip() or None,
+                    i.get("specDocFileUrl1") or None,
+                    json.dumps(i, ensure_ascii=False),
+                ))
+            con.executemany(
+                """insert or replace into prespec
+                   (spec_no,work_type,spec_nm,order_instt,bsns_div,sw_biz,budget,
+                    rgst_dt,opnin_clse_dt,bid_ntce_no,doc_url,raw)
+                   values (?,?,?,?,?,?,?,?,?,?,?,?)""", rows)
+            got += len(rows)
+            if got >= (total or 0):
+                break
+            page += 1
+            time.sleep(0.2)
+
+        con.execute("insert into cursor(work_type,last_dt) values(?,?) "
+                    "on conflict(work_type) do update set last_dt=excluded.last_dt", (ck, end))
+        con.commit()
+        total_got += got
+        print(f"  {wt} 사전규격: {bgn}~{end}  {got}건 (전체 {total})")
+
+    return total_got
+
+
+# 사전규격에는 대/중분류가 없다(실측). 쓸 수 있는 축은 사업명·SW여부·예산뿐이라
+# 조건을 근사한다: 키워드가 있으면 사업명 매칭, 없으면 ICT 계열은 SW사업으로.
+# ponytail: 근사 매칭이다. 사용자가 사전규격용 키워드를 따로 넣게 하고 싶어지면 컬럼을 판다.
+PRESPEC_MATCH_SQL = """
+insert or ignore into prespec_notified (condition_id, spec_no)
+select c.id, p.spec_no
+  from condition c
+  join prespec p
+    on p.work_type = c.work_type
+   and (c.amt_min = 0 or p.budget >= c.amt_min)
+   and (c.amt_max = 0 or p.budget <= c.amt_max)
+   and (
+        (c.keyword is not null and p.spec_nm like '%' || c.keyword || '%')
+     or (c.keyword is null and c.lrg_clsfc = 'ICT 서비스' and p.sw_biz = 1)
+       )
+ where c.active = 1 and c.want_prespec = 1
+   and p.seen_at >= datetime('now','localtime','-1 day')
+   -- 의견 마감이 지났으면 규격에 개입할 수 없다. 알릴 이유가 사라진다
+   and (p.opnin_clse_dt is null or p.opnin_clse_dt >= datetime('now','localtime'))
+"""
+
+
+def match_prespec(con):
+    before = con.execute("select count(*) c from prespec_notified").fetchone()["c"]
+    con.execute(PRESPEC_MATCH_SQL)
+    con.commit()
+    return con.execute("select count(*) c from prespec_notified").fetchone()["c"] - before
+
+
+def prespec_digest(con, cap=DAILY_CAP):
+    rows = con.execute("""
+        select u.id user_id, u.toss_key, c.label,
+               p.spec_no, p.spec_nm, p.budget, p.opnin_clse_dt, p.order_instt
+          from prespec_notified t
+          join condition c on c.id = t.condition_id
+          join app_user  u on u.id = c.user_id
+          join prespec   p on p.spec_no = t.spec_no
+         where t.sent_at is null and u.push_ok = 1 and c.active = 1
+           and (p.opnin_clse_dt is null or p.opnin_clse_dt >= datetime('now','localtime'))
+         order by u.id, p.opnin_clse_dt
+    """).fetchall()
+    out = {}
+    for r in rows:
+        v = out.setdefault(r["user_id"], {"toss_key": r["toss_key"], "items": [], "total": 0})
+        v["total"] += 1
+        if len(v["items"]) < cap:
+            v["items"].append(dict(r))
+    return out
+
+
+def mark_prespec_sent(con, user_ids):
+    con.executemany("""
+        update prespec_notified set sent_at = datetime('now','localtime')
+         where sent_at is null and condition_id in
+               (select id from condition where user_id = ?)""",
+        [(u,) for u in user_ids])
+    con.commit()
+
+
 # 조건 ↔ 공고 매칭. 전부 SQL 한 방으로 끝난다.
 # notice_latest 뷰를 보므로 변경공고(차수 1~5)가 재알림되지 않는다.
 MATCH_SQL = """
@@ -168,10 +297,6 @@ select c.id, n.bid_ntce_no
    -- 이미 마감된 공고는 알리지 않는다. 마감일시가 없는 건(14%)은 통과시킨다
    and (n.bid_clse_dt is null or n.bid_clse_dt >= datetime('now','localtime'))
 """
-
-# 푸시 피로 방지. 실측상 넓은 조건은 일 180건까지 나온다(VERIFIED.md).
-DAILY_CAP = 20
-
 
 def match(con):
     """신규 공고를 조건에 매칭해 알림 큐에 넣는다. 큐 적재 건수 반환."""
@@ -205,10 +330,6 @@ def pending_digest(con, cap=DAILY_CAP):
         if len(v["items"]) < cap:
             v["items"].append(dict(r))
     return out
-
-
-# 마감 임박 알림. 이 창이 좁으면 준비할 시간이 없고, 넓으면 잊는다.
-CLOSING_MIN_H, CLOSING_MAX_H = 6, 48
 
 
 def closing_digest(con, cap=DAILY_CAP):
@@ -274,13 +395,15 @@ def main():
 
     if cmd in ("collect", "run"):
         print("[수집]")
-        n = collect(con, _key())
+        key = _key()
+        n = collect(con, key)
+        n += collect_prespec(con, key)
         print(f"  총 {n}건 적재\n")
 
     if cmd in ("match", "run"):
         print("[매칭]")
-        q = match(con)
-        print(f"  알림 큐 {q}건 신규\n")
+        print(f"  공고 알림 큐 {match(con)}건 신규")
+        print(f"  사전규격 큐 {match_prespec(con)}건 신규\n")
         d = pending_digest(con)
         print(f"[신규 발송 대기] 사용자 {len(d)}명")
         for uid, v in list(d.items())[:5]:
@@ -288,6 +411,10 @@ def main():
         cd = closing_digest(con)
         print(f"[마감 임박 대기] 사용자 {len(cd)}명")
         for uid, v in list(cd.items())[:5]:
+            print(f"  user {uid}: {v['total']}건")
+        pd = prespec_digest(con)
+        print(f"[사전규격 대기] 사용자 {len(pd)}명")
+        for uid, v in list(pd.items())[:5]:
             print(f"  user {uid}: {v['total']}건")
 
     if cmd not in ("collect", "match", "run"):

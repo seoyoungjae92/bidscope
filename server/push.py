@@ -26,6 +26,7 @@ CERT = os.environ.get("TOSS_CERT")      # 클라이언트 인증서 (.pem)
 CERT_KEY = os.environ.get("TOSS_KEY")   # 개인키 (.pem)
 TEMPLATE_NEW = os.environ.get("TOSS_TEMPLATE_NEW", "BIDNOTE_NEW")
 TEMPLATE_CLOSING = os.environ.get("TOSS_TEMPLATE_CLOSING", "BIDNOTE_CLOSING")
+TEMPLATE_PRESPEC = os.environ.get("TOSS_TEMPLATE_PRESPEC", "BIDNOTE_PRESPEC")
 
 TITLE_MAX, BODY_MAX = 7, 25
 
@@ -81,6 +82,23 @@ def render_closing(digest: dict) -> dict:
     return {"title": title, "body": body}
 
 
+def render_prespec(digest: dict) -> dict:
+    """사전규격 = 공고 예고. 중앙값 7일 먼저 뜬다."""
+    items, total = digest["items"], digest["total"]
+    title = "공고 예고"
+    if total == 1:
+        tail = " 공고 예정이에요"
+        name = items[0]["spec_nm"][:BODY_MAX - len(tail)].strip()
+        body = f"{name}{tail}"
+    else:
+        body = f"관심 분야 {total}건 공고 예정이에요"
+        if len(body) > BODY_MAX:
+            body = f"{total}건 공고 예정이에요"
+    assert len(title) <= TITLE_MAX, f"제목 {len(title)}자: {title}"
+    assert len(body) <= BODY_MAX, f"본문 {len(body)}자: {body}"
+    return {"title": title, "body": body}
+
+
 def send_one(template: str, anon_key: str, context: dict) -> tuple:
     """mTLS로 단건 발송. (성공여부, 응답) 반환."""
     if not (CERT and CERT_KEY):
@@ -113,7 +131,9 @@ def run_batch(con, label, digests, renderer, template, mark, send):
         if not send:
             print(f"{head}   ({d['total']}건 중 본문 {len(d['items'])}건)")
             for i in d["items"][:2]:
-                print(f"        · {i['bid_ntce_nm'][:44]}")
+                # 공고는 bid_ntce_nm, 사전규격은 spec_nm
+                name = i.get("bid_ntce_nm") or i.get("spec_nm") or "?"
+                print(f"        · {name[:44]}")
             continue
         ok, resp = send_one(template, d["toss_key"], {**msg, "count": str(d["total"])})
         print(f"{head}  →  {'OK' if ok else 'FAIL ' + resp}")
@@ -128,15 +148,18 @@ def run_batch(con, label, digests, renderer, template, mark, send):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--send", action="store_true", help="실제 발송 (기본은 dry-run)")
-    ap.add_argument("--kind", choices=["new", "closing", "both"], default="both")
+    ap.add_argument("--kind", choices=["new", "closing", "prespec", "all"], default="all")
     args = ap.parse_args()
 
     con = db.init()
     total = 0
-    if args.kind in ("new", "both"):
+    if args.kind in ("prespec", "all"):
+        total += run_batch(con, "공고 예고", g2b.prespec_digest(con), render_prespec,
+                           TEMPLATE_PRESPEC, g2b.mark_prespec_sent, args.send)
+    if args.kind in ("new", "all"):
         total += run_batch(con, "신규 공고", g2b.pending_digest(con), render,
                            TEMPLATE_NEW, g2b.mark_sent, args.send)
-    if args.kind in ("closing", "both"):
+    if args.kind in ("closing", "all"):
         total += run_batch(con, "마감 임박", g2b.closing_digest(con), render_closing,
                            TEMPLATE_CLOSING, g2b.mark_closing_sent, args.send)
     if not args.send:

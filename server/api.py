@@ -15,7 +15,7 @@ from urllib.parse import parse_qs, urlparse
 
 import db
 
-APP_NAME = os.environ.get("APP_NAME", "bidnote")  # 콘솔에서 확정한 appName
+APP_NAME = os.environ.get("APP_NAME", "bidscope")  # 콘솔에서 확정한 appName
 ORIGINS = [
     f"https://{APP_NAME}.apps.tossmini.com",
     f"https://{APP_NAME}.private-apps.tossmini.com",
@@ -144,6 +144,21 @@ def notices(con, req, m, q, body):
     sql += " order by (n.bid_clse_dt is null), n.bid_clse_dt limit ?"
     args.append(min(int((q.get("limit") or [30])[0]), 100))
     return [dict(r) for r in con.execute(sql, args)]
+
+
+@route("GET", "/prespecs")
+def prespecs(con, req, m, q, body):
+    """내 조건에 걸린 사전규격(공고 예고). 의견 마감 임박순."""
+    uid = user_id(con, req)
+    return [dict(r) for r in con.execute("""
+        select distinct p.spec_no, p.spec_nm, p.order_instt, p.budget,
+               p.opnin_clse_dt, p.bid_ntce_no, p.doc_url, c.id cond_id, c.label
+          from prespec_notified t
+          join condition c on c.id=t.condition_id and c.user_id=? and c.active=1
+          join prespec   p on p.spec_no=t.spec_no
+         where (p.opnin_clse_dt is null or p.opnin_clse_dt >= datetime('now','localtime'))
+         order by (p.opnin_clse_dt is null), p.opnin_clse_dt limit ?""",
+        (uid, min(int((q.get("limit") or [30])[0]), 100)))]
 
 
 @route("POST", "/push-consent")

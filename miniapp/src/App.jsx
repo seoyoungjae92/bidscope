@@ -17,6 +17,7 @@ export default function App() {
   const [view, setView] = useState('loading'); // loading | list | new
   const [conditions, setConditions] = useState([]);
   const [notices, setNotices] = useState([]);
+  const [prespecs, setPrespecs] = useState([]);
   const [error, setError] = useState(null);
 
   const load = useCallback(async () => {
@@ -24,7 +25,9 @@ export default function App() {
       const cs = await api.getConditions();
       setConditions(cs);
       if (cs.length === 0) return setView('new');
-      setNotices(await api.getNotices());
+      const [ns, ps] = await Promise.all([api.getNotices(), api.getPrespecs()]);
+      setNotices(ns);
+      setPrespecs(ps);
       setView('list');
     } catch (e) {
       setError(e.message);
@@ -46,6 +49,7 @@ export default function App() {
     <Main
       conditions={conditions}
       notices={notices}
+      prespecs={prespecs}
       error={error}
       onAdd={() => setView('new')}
       onReload={load}
@@ -53,7 +57,7 @@ export default function App() {
   );
 }
 
-function Main({ conditions, notices, error, onAdd, onReload }) {
+function Main({ conditions, notices, prespecs, error, onAdd, onReload }) {
   const [consent, setConsent] = useState(null);
 
   async function askPush() {
@@ -70,8 +74,8 @@ function Main({ conditions, notices, error, onAdd, onReload }) {
   return (
     <div className="page">
       <header className="top">
-        <h1>입찰알리미</h1>
-        <p className="sub">공공기관 입찰공고 알림</p>
+        <h1>입찰레이더</h1>
+        <p className="sub">공고 뜨기 전에 미리 알려드려요</p>
       </header>
 
       {error && <p className="error">{error}</p>}
@@ -99,6 +103,31 @@ function Main({ conditions, notices, error, onAdd, onReload }) {
         <button className="cta" onClick={askPush}>
           공고 올라오면 알림 받기
         </button>
+      )}
+
+      {prespecs.length > 0 && (
+        <section>
+          <h2>공고 예고 {prespecs.length}건</h2>
+          <p className="dim pad">
+            사전규격 단계예요. 보통 일주일쯤 뒤에 공고가 납니다.
+          </p>
+          {prespecs.map((p) => (
+            <button
+              key={p.spec_no}
+              className="notice"
+              onClick={() => p.doc_url && Device.openURL({ url: p.doc_url })}
+            >
+              <div className="notice-top">
+                <span className="badge pre">
+                  {p.opnin_clse_dt ? `의견 ${dday(p.opnin_clse_dt).text}` : '공고 예정'}
+                </span>
+                <span className="amt">{money(p.budget)}</span>
+              </div>
+              <div className="title">{p.spec_nm}</div>
+              <div className="dim">{p.order_instt}</div>
+            </button>
+          ))}
+        </section>
       )}
 
       <section>

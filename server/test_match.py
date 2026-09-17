@@ -119,8 +119,8 @@ def main():
     # 창(6~48h) 안의 공고만 잡힌다
     def set_clse(no, hours):
         con.execute("""update notice set bid_clse_dt =
-                       datetime('now','localtime','+' || ? || ' hours')
-                       where bid_ntce_no=?""", (hours, no))
+                       datetime('now','localtime',?) where bid_ntce_no=?""",
+                    (f"{hours:+d} hours", no))
         con.commit()
     set_clse("A1", 24)    # 창 안
     set_clse("A2", 3)     # 너무 임박 — 이미 늦었다
@@ -143,12 +143,57 @@ def main():
     m2 = push.render_closing({"items": [{}] * 3, "total": 3})
     assert len(m2["body"]) <= 25, m2
 
+    # ── 사전규격 ─────────────────────────────────────────────────────
+    def spec(no, nm, sw, budget, clse_hours):
+        # '+' || -5 || ' hours' 는 '+-5 hours'가 되어 SQLite가 NULL을 준다.
+        # 부호를 포함한 수정자를 통째로 넘긴다.
+        con.execute("""insert or replace into prespec
+            (spec_no,work_type,spec_nm,sw_biz,budget,opnin_clse_dt,raw)
+            values (?,'용역',?,?,?, datetime('now','localtime',?),'{}')""",
+            (no, nm, sw, budget, f"{clse_hours:+d} hours"))
+        con.commit()
+    spec("S1", "차세대 시스템 구축 사업", 1, 50_000_000, 72)     # SW · 의견창 열림
+    spec("S2", "청사 청소 위탁", 0, 30_000_000, 72)              # SW 아님
+    spec("S3", "AI 플랫폼 고도화", 1, 5_000_000_000, 72)         # SW지만 50억
+    spec("S4", "노후 시스템 개선", 1, 40_000_000, -5)            # 의견 마감 지남
+
+    c_ict2 = cond(con, lrg_clsfc="ICT 서비스", amt_max=100_000_000)
+    c_kw2 = cond(con, keyword="청소")
+    c_off2 = cond(con, lrg_clsfc="ICT 서비스", want_prespec=0)
+    g2b.match_prespec(con)
+
+    def pmatched(cid):
+        return {r["spec_no"] for r in con.execute(
+            "select spec_no from prespec_notified where condition_id=?", (cid,))}
+
+    assert pmatched(c_ict2) == {"S1"}, f"ICT 조건은 SW사업만: {pmatched(c_ict2)}"
+    assert pmatched(c_kw2) == {"S2"}, "키워드 조건은 사업명 매칭"
+    assert pmatched(c_off2) == set(), "want_prespec=0이면 매칭 안 됨"
+    assert "S4" not in pmatched(c_ict2), "의견 마감 지난 건 제외"
+    # 의견마감일이 없는 건(NULL)은 통과시킨다 — 공고 예고로는 여전히 쓸모 있다
+    spec("S5", "마감일 없는 SW 사업", 1, 40_000_000, 72)
+    con.execute("update prespec set opnin_clse_dt=null where spec_no='S5'")
+    con.commit()
+    g2b.match_prespec(con)
+    assert "S5" in pmatched(c_ict2), "의견마감일 NULL은 통과"
+
+    pd = g2b.prespec_digest(con)
+    assert set(pd) == {1}, "사전규격 다이제스트"
+    g2b.mark_prespec_sent(con, [1])
+    assert g2b.prespec_digest(con) == {}, "발송 후 큐가 빈다"
+
+    m3 = push.render_prespec({"items": [{"spec_nm": "가" * 50}], "total": 1})
+    assert len(m3["title"]) <= 7 and len(m3["body"]) <= 25, m3
+    m4 = push.render_prespec({"items": [{"spec_nm": "x"}] * 3, "total": 3})
+    assert len(m4["body"]) <= 25, m4
+
     con.execute("update app_user set push_ok=0 where id=1")
     con.commit()
     assert g2b.pending_digest(con) == {}, "미동의 유저는 제외"
     assert g2b.closing_digest(con) == {}, "미동의 유저는 마감 알림도 제외"
+    assert g2b.prespec_digest(con) == {}, "미동의 유저는 사전규격도 제외"
 
-    print(f"통과. 조건 10종 · 공고 {len(NOTICES)}건 · 큐 {n1}건 · 마감임박 6종")
+    print(f"통과. 조건 10종 · 공고 {len(NOTICES)}건 · 큐 {n1}건 · 마감임박 6종 · 사전규격 9종")
 
 
 if __name__ == "__main__":

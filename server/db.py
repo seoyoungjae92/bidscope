@@ -70,6 +70,34 @@ create table if not exists notified (
 );
 create index if not exists notified_pending on notified (sent_at) where sent_at is null;
 
+-- 사전규격. 입찰공고보다 중앙값 7일 먼저 뜬다(실측).
+-- 공고와 달리 대/중분류 체계가 없어서 매칭 축이 다르다.
+create table if not exists prespec (
+  spec_no       text primary key,        -- bfSpecRgstNo
+  work_type     text not null,
+  spec_nm       text not null,           -- prdctClsfcNoNm (실제로는 사업명)
+  order_instt   text,
+  bsns_div      text,                    -- 일반용역 | 기술용역
+  sw_biz        integer not null default 0,  -- swBizObjYn = Y
+  budget        integer not null default 0,  -- asignBdgtAmt
+  rgst_dt       text,
+  opnin_clse_dt text,                    -- 규격 의견 등록 마감
+  bid_ntce_no   text,                    -- 나중에 채워지는 공고번호 (88% 채워짐)
+  doc_url       text,
+  raw           text not null,
+  seen_at       text not null default (datetime('now','localtime'))
+);
+create index if not exists prespec_clse on prespec (opnin_clse_dt);
+
+-- 사전규격 알림 발송 이력
+create table if not exists prespec_notified (
+  condition_id integer not null,
+  spec_no      text not null,
+  sent_at      text,
+  primary key (condition_id, spec_no)
+);
+create index if not exists prespec_pending on prespec_notified (sent_at) where sent_at is null;
+
 -- 공고번호별 최신 차수만. 매칭·조회는 전부 이걸 본다.
 create view if not exists notice_latest as
 select n.* from notice n
@@ -89,6 +117,8 @@ def connect(path=None):
 # 기존 DB에 컬럼을 덧붙인다. create table if not exists는 컬럼을 추가하지 않는다.
 MIGRATIONS = [
     ("notified", "closing_sent_at", "alter table notified add column closing_sent_at text"),
+    ("condition", "want_prespec",
+     "alter table condition add column want_prespec integer not null default 1"),
 ]
 
 
