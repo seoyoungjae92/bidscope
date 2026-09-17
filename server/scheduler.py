@@ -65,7 +65,29 @@ def _next_at(now, hh, mm):
     return t if t > now else t + timedelta(days=1)
 
 
+def _seed_if_empty():
+    """빈 DB로 떴으면 한 번 수집한다.
+
+    새로 배포하면 다음 스케줄(최대 몇 시간 뒤)까지 빈 화면이 된다.
+    볼륨 없이 돌리는 동안에는 재배포마다 비므로 더 필요하다.
+    """
+    import db
+    con = db.connect()
+    try:
+        n = con.execute("select count(*) c from notice").fetchone()["c"]
+    finally:
+        con.close()
+    if n:
+        return
+    print("[scheduler] DB가 비어 있어요. 첫 수집을 시작합니다")
+    try:
+        _run("collect")
+    except Exception:
+        traceback.print_exc()
+
+
 def _loop():
+    _seed_if_empty()
     # 재시작 직후 같은 슬롯을 다시 돌지 않도록, 시작 시각 이후 것만 예약한다
     while True:
         now = datetime.now(KST)
