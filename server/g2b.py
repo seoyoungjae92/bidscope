@@ -207,6 +207,56 @@ def pending_digest(con, cap=DAILY_CAP):
     return out
 
 
+# 마감 임박 알림. 이 창이 좁으면 준비할 시간이 없고, 넓으면 잊는다.
+CLOSING_MIN_H, CLOSING_MAX_H = 6, 48
+
+
+def closing_digest(con, cap=DAILY_CAP):
+    """마감이 임박한 공고를 사용자별로 묶는다.
+
+    이미 신규 알림을 받은 공고만 대상이다 — 처음 보는 공고를
+    "곧 마감"이라고만 알리면 맥락이 없다.
+    """
+    rows = con.execute(f"""
+        select u.id user_id, u.toss_key, c.id cond_id, c.label,
+               n.bid_ntce_no, n.bid_ntce_nm, n.presmpt_prce, n.bid_clse_dt
+          from notified t
+          join condition    c on c.id = t.condition_id
+          join app_user     u on u.id = c.user_id
+          join notice_latest n on n.bid_ntce_no = t.bid_ntce_no
+         where t.sent_at is not null
+           and t.closing_sent_at is null
+           and u.push_ok = 1
+           and c.active = 1
+           and n.bid_clse_dt is not null
+           and n.bid_clse_dt >  datetime('now','localtime','+{CLOSING_MIN_H} hours')
+           and n.bid_clse_dt <= datetime('now','localtime','+{CLOSING_MAX_H} hours')
+         order by u.id, n.bid_clse_dt
+    """).fetchall()
+    out = {}
+    for r in rows:
+        v = out.setdefault(r["user_id"], {"toss_key": r["toss_key"], "items": [], "total": 0})
+        v["total"] += 1
+        if len(v["items"]) < cap:
+            v["items"].append(dict(r))
+    return out
+
+
+def mark_closing_sent(con, user_ids):
+    """마감 임박 발송 완료. 창을 벗어난 건도 함께 닫는다 —
+    안 그러면 이미 마감된 공고가 큐에 영원히 남는다."""
+    con.executemany(f"""
+        update notified set closing_sent_at = datetime('now','localtime')
+         where closing_sent_at is null and sent_at is not null
+           and condition_id in (select id from condition where user_id = ?)
+           and bid_ntce_no in (
+                 select bid_ntce_no from notice_latest
+                  where bid_clse_dt is not null
+                    and bid_clse_dt <= datetime('now','localtime','+{CLOSING_MAX_H} hours'))""",
+        [(u,) for u in user_ids])
+    con.commit()
+
+
 def mark_sent(con, user_ids):
     """발송 완료 처리. 상한 때문에 본문에 안 실린 건도 함께 소진한다
     (다음 배치에 밀리면 계속 쌓여서 영영 안 끝난다)."""
@@ -232,9 +282,13 @@ def main():
         q = match(con)
         print(f"  알림 큐 {q}건 신규\n")
         d = pending_digest(con)
-        print(f"[발송 대기] 사용자 {len(d)}명")
+        print(f"[신규 발송 대기] 사용자 {len(d)}명")
         for uid, v in list(d.items())[:5]:
-            print(f"  user {uid}: {len(v['items'])}건")
+            print(f"  user {uid}: {v['total']}건")
+        cd = closing_digest(con)
+        print(f"[마감 임박 대기] 사용자 {len(cd)}명")
+        for uid, v in list(cd.items())[:5]:
+            print(f"  user {uid}: {v['total']}건")
 
     if cmd not in ("collect", "match", "run"):
         sys.exit(__doc__)

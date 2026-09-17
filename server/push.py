@@ -24,7 +24,8 @@ PATH = "/api-partner/v1/apps-in-toss/messenger/send-message"
 
 CERT = os.environ.get("TOSS_CERT")      # 클라이언트 인증서 (.pem)
 CERT_KEY = os.environ.get("TOSS_KEY")   # 개인키 (.pem)
-TEMPLATE = os.environ.get("TOSS_TEMPLATE", "BIDNOTE_NEW")
+TEMPLATE_NEW = os.environ.get("TOSS_TEMPLATE_NEW", "BIDNOTE_NEW")
+TEMPLATE_CLOSING = os.environ.get("TOSS_TEMPLATE_CLOSING", "BIDNOTE_CLOSING")
 
 TITLE_MAX, BODY_MAX = 7, 25
 
@@ -61,14 +62,33 @@ def render(digest: dict) -> dict:
     return {"title": title, "body": body}
 
 
-def send_one(anon_key: str, context: dict) -> tuple:
+def render_closing(digest: dict) -> dict:
+    """마감 임박 다이제스트 → 제목·본문."""
+    items, total = digest["items"], digest["total"]
+    title = "마감 임박"
+    if total == 1:
+        it = items[0]
+        hhmm = str(it["bid_clse_dt"])[11:16]
+        tail = f" {hhmm} 마감이에요" if hhmm else " 곧 마감이에요"
+        name = it["bid_ntce_nm"][:BODY_MAX - len(tail)].strip()
+        body = f"{name}{tail}"
+    else:
+        body = f"관심 공고 {total}건 곧 마감이에요"
+        if len(body) > BODY_MAX:
+            body = f"공고 {total}건 곧 마감이에요"
+    assert len(title) <= TITLE_MAX, f"제목 {len(title)}자: {title}"
+    assert len(body) <= BODY_MAX, f"본문 {len(body)}자: {body}"
+    return {"title": title, "body": body}
+
+
+def send_one(template: str, anon_key: str, context: dict) -> tuple:
     """mTLS로 단건 발송. (성공여부, 응답) 반환."""
     if not (CERT and CERT_KEY):
         return False, "TOSS_CERT / TOSS_KEY 환경변수 없음"
     ctx = ssl.create_default_context()
     ctx.load_cert_chain(certfile=CERT, keyfile=CERT_KEY)
     conn = http.client.HTTPSConnection(HOST, context=ctx, timeout=20)
-    payload = json.dumps({"templateSetCode": TEMPLATE, "context": context},
+    payload = json.dumps({"templateSetCode": template, "context": context},
                          ensure_ascii=False)
     conn.request("POST", PATH, body=payload.encode(), headers={
         "Content-Type": "application/json",
@@ -81,37 +101,46 @@ def send_one(anon_key: str, context: dict) -> tuple:
     return ok, raw[:200]
 
 
+def run_batch(con, label, digests, renderer, template, mark, send):
+    if not digests:
+        print(f"[{label}] 보낼 것 없음")
+        return 0
+    print(f"[{label}] 대상 {len(digests)}명")
+    sent, failed = [], 0
+    for uid, d in digests.items():
+        msg = renderer(d)
+        head = f"  user {uid}  [{msg['title']}] {msg['body']}"
+        if not send:
+            print(f"{head}   ({d['total']}건 중 본문 {len(d['items'])}건)")
+            for i in d["items"][:2]:
+                print(f"        · {i['bid_ntce_nm'][:44]}")
+            continue
+        ok, resp = send_one(template, d["toss_key"], {**msg, "count": str(d["total"])})
+        print(f"{head}  →  {'OK' if ok else 'FAIL ' + resp}")
+        sent.append(uid) if ok else None
+        failed += 0 if ok else 1
+    if send and sent:
+        mark(con, sent)
+        print(f"  발송 {len(sent)} · 실패 {failed}")
+    return len(digests)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--send", action="store_true", help="실제 발송 (기본은 dry-run)")
+    ap.add_argument("--kind", choices=["new", "closing", "both"], default="both")
     args = ap.parse_args()
 
     con = db.init()
-    digests = g2b.pending_digest(con)
-    if not digests:
-        print("보낼 것 없음")
-        return
-
-    sent_users, failed = [], 0
-    for uid, d in digests.items():
-        msg = render(d)
-        head = f"user {uid}  [{msg['title']}] {msg['body']}"
-        if not args.send:
-            print(f"{head}   ({d['total']}건 중 본문 {len(d['items'])}건)")
-            for i in d["items"][:3]:
-                print(f"      · {i['bid_ntce_nm'][:44]}")
-            continue
-        ok, resp = send_one(d["toss_key"], {**msg, "count": str(d["total"])})
-        print(f"{head}  →  {'OK' if ok else 'FAIL ' + resp}")
-        if ok:
-            sent_users.append(uid)
-        else:
-            failed += 1
-
-    if args.send and sent_users:
-        g2b.mark_sent(con, sent_users)
-    print(f"\n대상 {len(digests)}명" +
-          (f" · 발송 {len(sent_users)} · 실패 {failed}" if args.send else " (dry-run)"))
+    total = 0
+    if args.kind in ("new", "both"):
+        total += run_batch(con, "신규 공고", g2b.pending_digest(con), render,
+                           TEMPLATE_NEW, g2b.mark_sent, args.send)
+    if args.kind in ("closing", "both"):
+        total += run_batch(con, "마감 임박", g2b.closing_digest(con), render_closing,
+                           TEMPLATE_CLOSING, g2b.mark_closing_sent, args.send)
+    if not args.send:
+        print("\n(dry-run — 실제 발송은 --send)")
 
 
 if __name__ == "__main__":

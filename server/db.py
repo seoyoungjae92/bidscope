@@ -62,9 +62,10 @@ create index if not exists condition_active on condition (active, work_type);
 -- 차수(bid_ntce_ord)는 키에 넣지 않는다 — 실측상 변경공고가 6차까지 가서
 -- 차수를 키에 넣으면 같은 공고를 8번 알리게 된다.
 create table if not exists notified (
-  condition_id integer not null,
-  bid_ntce_no  text not null,
-  sent_at      text,                     -- null = 큐에만 있고 미발송
+  condition_id   integer not null,
+  bid_ntce_no    text not null,
+  sent_at        text,                   -- 신규 공고 알림 발송 시각. null = 미발송
+  closing_sent_at text,                  -- 마감 임박 알림 발송 시각. 공고당 1회
   primary key (condition_id, bid_ntce_no)
 );
 create index if not exists notified_pending on notified (sent_at) where sent_at is null;
@@ -85,9 +86,19 @@ def connect(path=None):
     return con
 
 
+# 기존 DB에 컬럼을 덧붙인다. create table if not exists는 컬럼을 추가하지 않는다.
+MIGRATIONS = [
+    ("notified", "closing_sent_at", "alter table notified add column closing_sent_at text"),
+]
+
+
 def init(path=None):
     con = connect(path)
     con.executescript(SCHEMA)
+    for table, column, ddl in MIGRATIONS:
+        cols = {r["name"] for r in con.execute(f"pragma table_info({table})")}
+        if column not in cols:
+            con.execute(ddl)
     con.commit()
     return con
 

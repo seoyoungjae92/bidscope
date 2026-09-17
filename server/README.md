@@ -17,7 +17,8 @@ test_api.py    API 통합 점검 (실제 HTTP)
 export G2B_KEY='디코딩_인증키'
 python3 db.py          # 스키마 생성
 python3 g2b.py run     # 수집 + 매칭
-python3 push.py        # dry-run: 보낼 푸시 확인
+python3 push.py        # dry-run: 신규 + 마감 임박 둘 다
+python3 push.py --kind closing --send   # 마감 임박만 실제 발송
 python3 api.py         # :8000
 
 python3 test_match.py && python3 test_api.py
@@ -52,7 +53,8 @@ cd /opt/bidnote && python3 db.py
 G2B_KEY=디코딩_인증키
 BIDNOTE_DB=/opt/bidnote/bidnote.db
 APP_NAME=bidnote
-TOSS_TEMPLATE=BIDNOTE_NEW
+TOSS_TEMPLATE_NEW=BIDNOTE_NEW
+TOSS_TEMPLATE_CLOSING=BIDNOTE_CLOSING
 TOSS_CERT=/opt/bidnote/toss-cert.pem
 TOSS_KEY=/opt/bidnote/toss-key.pem
 ```
@@ -77,8 +79,10 @@ sudo systemctl enable --now bidnote-api
 ```cron
 # 수집 + 매칭: 국토부가 아니라 조달청이라 일중에도 올라온다. 3회면 충분
 0 9,13,18 * * *  cd /opt/bidnote && . /etc/bidnote.env && python3 g2b.py run >> log 2>&1
-# 발송: 하루 1회 오전에 다이제스트로 몰아서
-10 9 * * *       cd /opt/bidnote && . /etc/bidnote.env && python3 push.py --send >> log 2>&1
+# 신규 공고: 하루 1회 오전에 다이제스트로 몰아서
+10 9 * * *       cd /opt/bidnote && . /etc/bidnote.env && python3 push.py --kind new --send >> log 2>&1
+# 마감 임박: 오후에 한 번 더. 6~48시간 남은 것만, 공고당 1회
+0 15 * * *       cd /opt/bidnote && . /etc/bidnote.env && python3 push.py --kind closing --send >> log 2>&1
 # 백업
 30 3 * * *       sqlite3 /opt/bidnote/bidnote.db ".backup /opt/bidnote/backup.db"
 ```
@@ -97,11 +101,11 @@ api.example.com {
 - **조건에 분류나 키워드가 필수다.** 계약방법만 걸면 일 180건이 잡힌다. 분류를 걸면 일 13~16건으로 떨어진다.
 - **마감 지난 공고는 매칭·조회·푸시 전부에서 제외.** 마감일시가 없는 건(14%)은 통과시킨다.
 - **MVP는 용역만.** 분류체계가 채워져 오는 유일한 업무유형이다. 물품은 표본 300건 전부 분류가 비어 있어 키워드로만 가야 한다. `BIDNOTE_TYPES=용역,물품`으로 늘릴 수는 있다.
+- **마감 임박은 6~48시간 창에서만.** 더 임박하면 준비할 시간이 없고, 더 멀면 잊는다. 이미 신규 알림을 받은 공고만 대상이라 맥락 없는 알림이 안 나간다. 공고당 1회.
 - **푸시 일일 상한 20건.** 넘는 분량은 본문에 안 싣되 큐에서는 함께 소진한다(안 그러면 영영 안 끝난다).
 
 ## 아직 없는 것
 
 - **푸시 실발송** — 콘솔에서 mTLS 인증서 발급 + 템플릿 검수 통과 후에 `--send`가 동작한다. 그 전까진 dry-run만.
 - **구독(IAP)** — 무료 한도가 `api.FREE_CONDITIONS`에 하드코딩. 붙일 때 `app_user.plan` 컬럼으로 뺀다.
-- **마감 임박 알림** — 큐·템플릿 하나 더. 공고당 푸시 2회가 되어 리텐션이 올라간다.
 - 모니터링(Healthchecks.io 핑), 로그 로테이션.

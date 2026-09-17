@@ -35,6 +35,15 @@ cd miniapp && cp .env.example .env && npm install && npm run dev
 | [apt-alert-review.md](apt-alert-review.md) | 1차 검토(아파트 실거래가). 부동산 카테고리 제한으로 보류 |
 | [apt-alert-appendix.md](apt-alert-appendix.md) | 1차 검토 부록 — 시장·API·UX·아키텍처·리스크 전문 |
 
+## 로고
+
+```bash
+cd logo && python3 ../logo.py     # 600×600 PNG 3종 + 72px 미리보기
+```
+
+콘솔 규격: 정사각형 · **둥근 모서리 불가**(토스가 자체 마스킹) · 배경색 필수.
+`logo-card-blue.png`가 기본안이다.
+
 ## 검증 스크립트
 
 ```bash

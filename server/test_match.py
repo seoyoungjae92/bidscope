@@ -110,11 +110,45 @@ def main():
     g2b.mark_sent(con, [1])
     assert g2b.pending_digest(con) == {}, "발송 후 큐가 비어야 한다"
 
+    # ── 마감 임박 알림 ────────────────────────────────────────────────
+    import push
+    # 신규 알림을 이미 받은 공고만 대상이다
+    assert g2b.closing_digest(con) == {}, "sent_at이 없으면 마감 알림 대상 아님"
+    g2b.mark_sent(con, [1])
+
+    # 창(6~48h) 안의 공고만 잡힌다
+    def set_clse(no, hours):
+        con.execute("""update notice set bid_clse_dt =
+                       datetime('now','localtime','+' || ? || ' hours')
+                       where bid_ntce_no=?""", (hours, no))
+        con.commit()
+    set_clse("A1", 24)    # 창 안
+    set_clse("A2", 3)     # 너무 임박 — 이미 늦었다
+    set_clse("A3", 200)   # 아직 멀었다
+    set_clse("A4", 40)    # 창 안
+    cd = g2b.closing_digest(con)
+    got = {i["bid_ntce_no"] for i in cd[1]["items"]}
+    assert got == {"A1", "A4"}, f"마감 창 필터: {got}"
+
+    # 마감 임박은 공고당 1회
+    g2b.mark_closing_sent(con, [1])
+    assert g2b.closing_digest(con) == {}, "마감 알림은 1회만"
+
+    # 렌더 길이 제한
+    m = push.render_closing({"items": [{"bid_ntce_nm": "가" * 60,
+                                        "bid_clse_dt": "2026-09-19 15:00:00",
+                                        "presmpt_prce": 0, "label": None}], "total": 1})
+    assert len(m["title"]) <= 7 and len(m["body"]) <= 25, m
+    assert "15:00" in m["body"], m
+    m2 = push.render_closing({"items": [{}] * 3, "total": 3})
+    assert len(m2["body"]) <= 25, m2
+
     con.execute("update app_user set push_ok=0 where id=1")
     con.commit()
     assert g2b.pending_digest(con) == {}, "미동의 유저는 제외"
+    assert g2b.closing_digest(con) == {}, "미동의 유저는 마감 알림도 제외"
 
-    print(f"통과. 조건 10종 · 공고 {len(NOTICES)}건 · 큐 {n1}건")
+    print(f"통과. 조건 10종 · 공고 {len(NOTICES)}건 · 큐 {n1}건 · 마감임박 6종")
 
 
 if __name__ == "__main__":
