@@ -11,9 +11,13 @@
 푸시는 3종: **공고 예고**(사전규격) → **새 입찰공고** → **마감 임박**.
 
 ```
-server/     수집·매칭·푸시·API   (Python 3.9+, 의존성 0)
-miniapp/    토스 미니앱          (Vite + React 19 + SDK 3.4.1)
+server/     수집·매칭·푸시·API + 스케줄러  (Python 3.9+, 의존성 0)
+miniapp/    토스 미니앱                  (Vite + React 19 + SDK 3.4.1)
 ```
+
+**배포처**: 서버만 Railway에 올린다(볼륨 1개 + 서비스 1개).
+미니앱은 `.ait` 번들을 토스 콘솔에 올리면 토스가 호스팅하므로
+Vercel 같은 프론트 배포처가 필요 없다. 자세한 건 [server/README](server/README.md).
 
 ## 빠른 시작
 

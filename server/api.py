@@ -15,6 +15,7 @@ from urllib.parse import parse_qs, urlparse
 
 import db
 import g2b
+import scheduler
 
 APP_NAME = os.environ.get("APP_NAME", "bidscope")  # 콘솔에서 확정한 appName
 ORIGINS = [
@@ -255,8 +256,9 @@ class Handler(BaseHTTPRequestHandler):
 
 def main():
     db.init()
+    scheduler.start()
     port = int(os.environ.get("PORT", 8000))
-    print(f"bidnote api :{port}  (appName={APP_NAME})")
+    print(f"bidscope api :{port}  (appName={APP_NAME})")
     ThreadingHTTPServer(("0.0.0.0", port), Handler).serve_forever()
 
 

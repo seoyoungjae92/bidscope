@@ -40,7 +40,54 @@ python3 test_match.py && python3 test_api.py
 | `GET` | `/prespecs?limit=` | **공고 예고(사전규격).** 의견 마감 임박순 |
 | `POST` | `/push-consent` | `requestAgreement()` 결과 저장 |
 
-## 배포 (Lightsail 2GB · 월 $12)
+## 배포 (Railway)
+
+미니앱 프론트는 배포처가 따로 없다 — `.ait` 번들을 토스 콘솔에 올리면
+토스가 `{appName}.apps.tossmini.com`에 호스팅한다. 서버만 올리면 된다.
+
+**왜 서비스 하나인가**: Railway 볼륨은 서비스당 하나라, 크론을 별도 서비스로
+빼면 같은 SQLite 파일을 볼 수 없다. 그래서 스케줄러를 API 프로세스 안에
+데몬 스레드로 넣었다(`scheduler.py`). 서비스 1개, 볼륨 1개로 끝난다.
+
+```bash
+railway init
+railway volume add --mount-path /data     # SQLite가 여기 산다
+railway up
+```
+
+**환경변수** (Railway 대시보드)
+```
+G2B_KEY=디코딩_인증키
+BIDNOTE_DB=/data/bidscope.db      # 볼륨 안이어야 재배포에도 남는다
+APP_NAME=bidscope
+SCHEDULER=on                      # 배치 스케줄러 켜기
+PUSH_SEND=                        # 템플릿 검수 통과 후 on
+TOSS_TEMPLATE_NEW=BIDSCOPE_NEW
+TOSS_TEMPLATE_CLOSING=BIDSCOPE_CLOSING
+TOSS_TEMPLATE_PRESPEC=BIDSCOPE_PRESPEC
+TOSS_CERT=/data/toss-cert.pem
+TOSS_KEY=/data/toss-key.pem
+ALLOW_ORIGINS=                    # 운영에서는 비운다
+```
+
+`PORT`는 Railway가 주입하고 `api.py`가 그대로 읽는다.
+HTTPS 도메인(`*.up.railway.app`)이 자동으로 붙어서 따로 살 필요가 없다 —
+토스 미니앱은 https만 허용한다.
+
+미니앱 쪽 `.env`:
+```
+VITE_API_BASE=https://<서비스>.up.railway.app
+```
+
+**백업**: 볼륨은 자동 백업이 없다. 잃으면 안 되는 건 `app_user`·`condition`·
+`notified` 뿐이고 수 MB다. 공고·사전규격은 API에서 언제든 다시 만든다.
+```bash
+railway run sqlite3 /data/bidscope.db ".backup /data/backup.db"
+```
+
+<details>
+<summary>대안: 단일 VM (Lightsail 2GB · 월 $12)</summary>
+
 
 ```bash
 sudo apt update && sudo apt install -y python3 caddy
@@ -101,6 +148,8 @@ api.example.com {
     reverse_proxy localhost:8000
 }
 ```
+
+</details>
 
 ## 설계 메모 (실측 근거)
 
