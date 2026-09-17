@@ -4,6 +4,12 @@ import sqlite3
 
 DB_PATH = os.environ.get("BIDNOTE_DB", "bidnote.db")
 
+# 공고 시각은 전부 KST다. 컨테이너에 tzdata가 없으면 TZ를 설정해도
+# localtime이 UTC로 폴백해서 마감 필터가 9시간 어긋난다.
+# 한국은 서머타임이 없으므로 오프셋을 그대로 박는 게 가장 확실하다.
+KST = "'now','+9 hours'"
+NOW = f"datetime({KST})"
+
 SCHEMA = """
 -- 공고 원장. 자연키는 (공고번호, 차수) — 변경공고는 차수가 올라온다.
 create table if not exists notice (
@@ -22,7 +28,7 @@ create table if not exists notice (
   openg_dt      text,                    -- 개찰일시
   detail_url    text,
   raw           text not null,           -- 원본 JSON. 나중에 필드 추가할 때 재파싱용
-  seen_at       text not null default (datetime('now','localtime')),
+  seen_at       text not null default (datetime('now','+9 hours')),
   primary key (bid_ntce_no, bid_ntce_ord)
 );
 create index if not exists notice_dt on notice (bid_ntce_dt desc);
@@ -38,7 +44,7 @@ create table if not exists app_user (
   id         integer primary key autoincrement,
   toss_key   text unique not null,       -- 익명키 해시 또는 userKey
   push_ok    integer not null default 0, -- 알림 동의 여부
-  created_at text not null default (datetime('now','localtime'))
+  created_at text not null default (datetime('now','+9 hours'))
 );
 
 -- 사용자가 등록한 알림 조건. 컬럼이 곧 조건 등록 UX다.
@@ -54,7 +60,7 @@ create table if not exists condition (
   cntrct_mthd text,                      -- null = 전체, '수의계약' 등
   keyword     text,                      -- 분류로 안 잡히는 것 보완
   active      integer not null default 1,
-  created_at  text not null default (datetime('now','localtime'))
+  created_at  text not null default (datetime('now','+9 hours'))
 );
 create index if not exists condition_active on condition (active, work_type);
 
@@ -85,7 +91,7 @@ create table if not exists prespec (
   bid_ntce_no   text,                    -- 나중에 채워지는 공고번호 (88% 채워짐)
   doc_url       text,
   raw           text not null,
-  seen_at       text not null default (datetime('now','localtime'))
+  seen_at       text not null default (datetime('now','+9 hours'))
 );
 create index if not exists prespec_clse on prespec (opnin_clse_dt);
 

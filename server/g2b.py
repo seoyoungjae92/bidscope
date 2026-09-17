@@ -240,17 +240,17 @@ select c.id, p.spec_no
        )
  where c.active = 1 and c.want_prespec = 1
    -- 의견 마감이 지났으면 규격에 개입할 수 없다. 알릴 이유가 사라진다
-   and (p.opnin_clse_dt is null or p.opnin_clse_dt >= datetime('now','localtime'))
+   and (p.opnin_clse_dt is null or p.opnin_clse_dt >= datetime('now','+9 hours'))
 """
 
 PRESPEC_MATCH_SQL = ("insert or ignore into prespec_notified (condition_id, spec_no)"
                      + _PRESPEC_BODY
-                     + " and p.seen_at >= datetime('now','localtime','-1 day')")
+                     + " and p.seen_at >= datetime('now','+9 hours','-1 day')")
 
 PRESPEC_BACKFILL_SQL = (
     "insert or ignore into prespec_notified (condition_id, spec_no, sent_at)"
     + _PRESPEC_BODY.replace("select c.id, p.spec_no",
-                            "select c.id, p.spec_no, datetime('now','localtime')")
+                            "select c.id, p.spec_no, datetime('now','+9 hours')")
     + " and c.id = ?")
 
 
@@ -270,7 +270,7 @@ def prespec_digest(con, cap=DAILY_CAP):
           join app_user  u on u.id = c.user_id
           join prespec   p on p.spec_no = t.spec_no
          where t.sent_at is null and u.push_ok = 1 and c.active = 1
-           and (p.opnin_clse_dt is null or p.opnin_clse_dt >= datetime('now','localtime'))
+           and (p.opnin_clse_dt is null or p.opnin_clse_dt >= datetime('now','+9 hours'))
          order by u.id, p.opnin_clse_dt
     """).fetchall()
     out = {}
@@ -284,7 +284,7 @@ def prespec_digest(con, cap=DAILY_CAP):
 
 def mark_prespec_sent(con, user_ids):
     con.executemany("""
-        update prespec_notified set sent_at = datetime('now','localtime')
+        update prespec_notified set sent_at = datetime('now','+9 hours')
          where sent_at is null and condition_id in
                (select id from condition where user_id = ?)""",
         [(u,) for u in user_ids])
@@ -306,20 +306,20 @@ select c.id, n.bid_ntce_no
    and (c.keyword is null or n.bid_ntce_nm like '%' || c.keyword || '%')
  where c.active = 1
    -- 이미 마감된 공고는 알리지 않는다. 마감일시가 없는 건(14%)은 통과시킨다
-   and (n.bid_clse_dt is null or n.bid_clse_dt >= datetime('now','localtime'))
+   and (n.bid_clse_dt is null or n.bid_clse_dt >= datetime('now','+9 hours'))
 """
 
 # 배치: 최근 수집분만 본다. 이미 처리한 공고를 매번 다시 훑지 않는다.
 MATCH_SQL = ("insert or ignore into notified (condition_id, bid_ntce_no)"
              + _MATCH_BODY
-             + " and n.seen_at >= datetime('now','localtime','-1 day')")
+             + " and n.seen_at >= datetime('now','+9 hours','-1 day')")
 
 # 백필: 조건을 새로 만든 직후 기존 공고를 한 번에 채운다.
 # sent_at을 미리 박아 푸시는 안 나가게 한다 — 등록하자마자 수십 건이
 # 푸시로 쏟아지면 그대로 알림을 끈다.
 BACKFILL_SQL = ("insert or ignore into notified (condition_id, bid_ntce_no, sent_at)"
                 + _MATCH_BODY.replace("select c.id, n.bid_ntce_no",
-                                      "select c.id, n.bid_ntce_no, datetime('now','localtime')")
+                                      "select c.id, n.bid_ntce_no, datetime('now','+9 hours')")
                 + " and c.id = ?")
 
 def match(con):
@@ -362,7 +362,7 @@ def pending_digest(con, cap=DAILY_CAP):
           join app_user     u on u.id = c.user_id
           join notice_latest n on n.bid_ntce_no = t.bid_ntce_no
          where t.sent_at is null and u.push_ok = 1
-           and (n.bid_clse_dt is null or n.bid_clse_dt >= datetime('now','localtime'))
+           and (n.bid_clse_dt is null or n.bid_clse_dt >= datetime('now','+9 hours'))
          order by u.id, (n.bid_clse_dt is null), n.bid_clse_dt
     """).fetchall()
     out = {}
@@ -392,8 +392,8 @@ def closing_digest(con, cap=DAILY_CAP):
            and u.push_ok = 1
            and c.active = 1
            and n.bid_clse_dt is not null
-           and n.bid_clse_dt >  datetime('now','localtime','+{CLOSING_MIN_H} hours')
-           and n.bid_clse_dt <= datetime('now','localtime','+{CLOSING_MAX_H} hours')
+           and n.bid_clse_dt >  datetime('now','+9 hours','+{CLOSING_MIN_H} hours')
+           and n.bid_clse_dt <= datetime('now','+9 hours','+{CLOSING_MAX_H} hours')
          order by u.id, n.bid_clse_dt
     """).fetchall()
     out = {}
@@ -409,13 +409,13 @@ def mark_closing_sent(con, user_ids):
     """마감 임박 발송 완료. 창을 벗어난 건도 함께 닫는다 —
     안 그러면 이미 마감된 공고가 큐에 영원히 남는다."""
     con.executemany(f"""
-        update notified set closing_sent_at = datetime('now','localtime')
+        update notified set closing_sent_at = datetime('now','+9 hours')
          where closing_sent_at is null and sent_at is not null
            and condition_id in (select id from condition where user_id = ?)
            and bid_ntce_no in (
                  select bid_ntce_no from notice_latest
                   where bid_clse_dt is not null
-                    and bid_clse_dt <= datetime('now','localtime','+{CLOSING_MAX_H} hours'))""",
+                    and bid_clse_dt <= datetime('now','+9 hours','+{CLOSING_MAX_H} hours'))""",
         [(u,) for u in user_ids])
     con.commit()
 
@@ -424,7 +424,7 @@ def mark_sent(con, user_ids):
     """발송 완료 처리. 상한 때문에 본문에 안 실린 건도 함께 소진한다
     (다음 배치에 밀리면 계속 쌓여서 영영 안 끝난다)."""
     con.executemany("""
-        update notified set sent_at = datetime('now','localtime')
+        update notified set sent_at = datetime('now','+9 hours')
          where sent_at is null and condition_id in
                (select id from condition where user_id = ?)""",
         [(u,) for u in user_ids])

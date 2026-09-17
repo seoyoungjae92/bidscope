@@ -11,10 +11,22 @@ import time
 import db
 import g2b
 
-# 컨테이너는 UTC로 돈다. 공고 시각은 KST라 9시간 어긋나면
-# 이미 마감된 공고를 계속 알리게 된다.
-assert os.environ.get("TZ") == "Asia/Seoul", "g2b import가 TZ를 KST로 고정해야 한다"
-assert time.strftime("%z") == "+0900", f"KST가 아니다: {time.strftime('%z')}"
+# 컨테이너는 UTC로 돌고 tzdata가 없을 수 있다. TZ 설정에 기대지 않고
+# SQL이 직접 +9시간을 쓰는지 검증한다. 어긋나면 마감된 공고를 계속 알린다.
+def _tz_check():
+    import sqlite3
+    from datetime import datetime, timedelta, timezone
+    c = sqlite3.connect(":memory:")
+    got = c.execute(f"select {db.NOW}").fetchone()[0]
+    want = datetime.now(timezone(timedelta(hours=9))).strftime("%Y-%m-%d %H:%M")
+    assert got[:16] == want, f"SQL 시각이 KST가 아니다: {got} vs {want}"
+    for f in ("db.py", "g2b.py", "api.py"):
+        for line in open(f):
+            assert "datetime('now','localtime'" not in line, \
+                f"{f}에 localtime이 남아있다 (tzdata 없는 컨테이너에서 UTC로 폴백한다)"
+
+
+_tz_check()
 
 NOTICES = [
     # (공고번호, 차수, 공고명, 대분류, 중분류, 계약방법, 추정가격)
