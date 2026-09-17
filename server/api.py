@@ -14,6 +14,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
 import db
+import g2b
 
 APP_NAME = os.environ.get("APP_NAME", "bidscope")  # 콘솔에서 확정한 appName
 ORIGINS = [
@@ -112,7 +113,9 @@ def add_condition(con, req, m, q, body):
          int(body.get("amt_min") or 0), int(body.get("amt_max") or 0),
          body.get("cntrct_mthd") or None, kw[:40] if kw else None)).lastrowid
     con.commit()
-    return {"id": cid}, 201
+    # 등록 직후 기존 공고를 채운다. 없으면 빈 화면을 보고 나간다.
+    notices, prespecs = g2b.backfill_condition(con, cid)
+    return {"id": cid, "notices": notices, "prespecs": prespecs}, 201
 
 
 @route("DELETE", r"/conditions/(\d+)")

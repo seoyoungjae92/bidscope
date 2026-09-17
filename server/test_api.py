@@ -79,12 +79,24 @@ def main():
         s, b, _ = req("POST", "/conditions", {"lrg_clsfc": "ICT 서비스", "work_type": "헛소리"})
         assert s == 422, (s, b)
 
-        # 정상 등록
+        # 정상 등록 — 등록 즉시 기존 공고가 채워져야 한다(빈 화면 방지)
         s, b, _ = req("POST", "/conditions",
                       {"label": "SW개발", "lrg_clsfc": "ICT 서비스",
                        "mid_clsfc": "SW 및 시스템 개발", "amt_max": 100_000_000})
         assert s == 201, (s, b)
         cid = b["id"]
+        assert b["notices"] == 1, f"등록 직후 백필: {b}"   # 마감 지난 건 제외
+
+        # 백필분은 발송 완료로 표시돼 푸시가 안 나간다
+        con = db.connect()
+        assert con.execute(
+            "select count(*) c from notified where condition_id=? and sent_at is null",
+            (cid,)).fetchone()["c"] == 0, "백필이 푸시 큐에 쌓이면 안 된다"
+        con.close()
+
+        # 등록 즉시 목록에 보인다 (배치를 기다리지 않는다)
+        s, imm, _ = req("GET", "/notices")
+        assert {x["bid_ntce_nm"] for x in imm} == {"SW 개발 용역"}, imm
 
         s, b, _ = req("GET", "/conditions")
         assert s == 200 and len(b) == 1 and b[0]["label"] == "SW개발", b
@@ -102,7 +114,7 @@ def main():
         s, b, _ = req("GET", "/conditions", key="user-b")
         assert s == 200 and b == [], b
 
-        # 매칭 후 공고 조회: 마감 지난 건은 빠진다
+        # 배치 매칭 후에도 마감 지난 건은 빠진다
         import g2b
         con = db.connect()
         con.execute("update app_user set push_ok=1")
@@ -160,7 +172,7 @@ def main():
         except urllib.error.HTTPError as e:
             assert e.code == 400, e.code
 
-        print("통과. 엔드포인트 7종 · 검증 24건")
+        print("통과. 엔드포인트 7종 · 검증 27건")
     finally:
         srv.shutdown()
 

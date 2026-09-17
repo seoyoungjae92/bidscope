@@ -176,6 +176,7 @@ function NewCondition({ first, onDone, onCancel }) {
   const [mid, setMid] = useState(null);
   const [amt, setAmt] = useState(AMOUNTS[0]);
   const [method, setMethod] = useState('전체');
+  const [keyword, setKeyword] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
 
@@ -192,6 +193,7 @@ function NewCondition({ first, onDone, onCancel }) {
         amt_min: amt.min,
         amt_max: amt.max,
         cntrct_mthd: method === '전체' ? null : method,
+        keyword: keyword.trim() || null,
       });
       onDone();
     } catch (e) {
@@ -254,6 +256,23 @@ function NewCondition({ first, onDone, onCancel }) {
             >{a.label}</button>
           ))}
         </div>
+      </section>
+
+      <section>
+        <h2>관심 키워드 <span className="dim">(선택)</span></h2>
+        <p className="dim pad">
+          공고 예고는 분야 정보가 없어서 키워드로 찾아요.
+          예고까지 받으려면 넣어주세요.
+        </p>
+        <input
+          className="field"
+          type="text"
+          inputMode="text"
+          maxLength={40}
+          placeholder="예) 홈페이지, 유지관리, 데이터"
+          value={keyword}
+          onChange={(e) => setKeyword(e.target.value)}
+        />
       </section>
 
       <section>

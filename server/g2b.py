@@ -222,8 +222,7 @@ def collect_prespec(con, key):
 # 사전규격에는 대/중분류가 없다(실측). 쓸 수 있는 축은 사업명·SW여부·예산뿐이라
 # 조건을 근사한다: 키워드가 있으면 사업명 매칭, 없으면 ICT 계열은 SW사업으로.
 # ponytail: 근사 매칭이다. 사용자가 사전규격용 키워드를 따로 넣게 하고 싶어지면 컬럼을 판다.
-PRESPEC_MATCH_SQL = """
-insert or ignore into prespec_notified (condition_id, spec_no)
+_PRESPEC_BODY = """
 select c.id, p.spec_no
   from condition c
   join prespec p
@@ -235,10 +234,19 @@ select c.id, p.spec_no
      or (c.keyword is null and c.lrg_clsfc = 'ICT 서비스' and p.sw_biz = 1)
        )
  where c.active = 1 and c.want_prespec = 1
-   and p.seen_at >= datetime('now','localtime','-1 day')
    -- 의견 마감이 지났으면 규격에 개입할 수 없다. 알릴 이유가 사라진다
    and (p.opnin_clse_dt is null or p.opnin_clse_dt >= datetime('now','localtime'))
 """
+
+PRESPEC_MATCH_SQL = ("insert or ignore into prespec_notified (condition_id, spec_no)"
+                     + _PRESPEC_BODY
+                     + " and p.seen_at >= datetime('now','localtime','-1 day')")
+
+PRESPEC_BACKFILL_SQL = (
+    "insert or ignore into prespec_notified (condition_id, spec_no, sent_at)"
+    + _PRESPEC_BODY.replace("select c.id, p.spec_no",
+                            "select c.id, p.spec_no, datetime('now','localtime')")
+    + " and c.id = ?")
 
 
 def match_prespec(con):
@@ -280,8 +288,7 @@ def mark_prespec_sent(con, user_ids):
 
 # 조건 ↔ 공고 매칭. 전부 SQL 한 방으로 끝난다.
 # notice_latest 뷰를 보므로 변경공고(차수 1~5)가 재알림되지 않는다.
-MATCH_SQL = """
-insert or ignore into notified (condition_id, bid_ntce_no)
+_MATCH_BODY = """
 select c.id, n.bid_ntce_no
   from condition c
   join notice_latest n
@@ -293,10 +300,22 @@ select c.id, n.bid_ntce_no
    and (c.amt_max = 0 or n.presmpt_prce <= c.amt_max)
    and (c.keyword is null or n.bid_ntce_nm like '%' || c.keyword || '%')
  where c.active = 1
-   and n.seen_at >= datetime('now','localtime','-1 day')
    -- 이미 마감된 공고는 알리지 않는다. 마감일시가 없는 건(14%)은 통과시킨다
    and (n.bid_clse_dt is null or n.bid_clse_dt >= datetime('now','localtime'))
 """
+
+# 배치: 최근 수집분만 본다. 이미 처리한 공고를 매번 다시 훑지 않는다.
+MATCH_SQL = ("insert or ignore into notified (condition_id, bid_ntce_no)"
+             + _MATCH_BODY
+             + " and n.seen_at >= datetime('now','localtime','-1 day')")
+
+# 백필: 조건을 새로 만든 직후 기존 공고를 한 번에 채운다.
+# sent_at을 미리 박아 푸시는 안 나가게 한다 — 등록하자마자 수십 건이
+# 푸시로 쏟아지면 그대로 알림을 끈다.
+BACKFILL_SQL = ("insert or ignore into notified (condition_id, bid_ntce_no, sent_at)"
+                + _MATCH_BODY.replace("select c.id, n.bid_ntce_no",
+                                      "select c.id, n.bid_ntce_no, datetime('now','localtime')")
+                + " and c.id = ?")
 
 def match(con):
     """신규 공고를 조건에 매칭해 알림 큐에 넣는다. 큐 적재 건수 반환."""
@@ -304,6 +323,24 @@ def match(con):
     con.execute(MATCH_SQL)
     con.commit()
     return con.execute("select count(*) c from notified").fetchone()["c"] - before
+
+
+def backfill_condition(con, condition_id):
+    """조건을 새로 만들면 기존 공고·사전규격을 즉시 채운다.
+
+    이게 없으면 등록 직후 빈 화면을 본다 — 첫 세션에서 실제 공고를
+    보여주는 게 이 앱에서 가장 중요한 순간이다.
+    발송 완료로 표시해 푸시는 내보내지 않는다.
+    """
+    con.execute(BACKFILL_SQL, (condition_id,))
+    con.execute(PRESPEC_BACKFILL_SQL, (condition_id,))
+    con.commit()
+    return (
+        con.execute("select count(*) c from notified where condition_id=?",
+                    (condition_id,)).fetchone()["c"],
+        con.execute("select count(*) c from prespec_notified where condition_id=?",
+                    (condition_id,)).fetchone()["c"],
+    )
 
 
 def pending_digest(con, cap=DAILY_CAP):

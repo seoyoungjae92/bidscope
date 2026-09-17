@@ -90,6 +90,15 @@ section h2 .count { color: var(--blue); }
   overflow: hidden;
 }
 
+/* 입력 */
+.field {
+  width: 100%; padding: 14px 16px; border-radius: 12px;
+  background: var(--line); border: 0; font-size: 16px; color: var(--ink);
+  font-family: inherit;
+}
+.field::placeholder { color: var(--dim); }
+.field:focus { outline: 2px solid var(--blue); outline-offset: 0; background: #fff; }
+
 /* 선택 칩 */
 .chips { display: flex; flex-wrap: wrap; gap: 8px; }
 .chip {
