@@ -19,6 +19,9 @@ miniapp/    토스 미니앱                  (Vite + React 19 + SDK 3.4.1)
 미니앱은 `.ait` 번들을 토스 콘솔에 올리면 토스가 호스팅하므로
 Vercel 같은 프론트 배포처가 필요 없다. 자세한 건 [server/README](server/README.md).
 
+> **다른 PC에서 이어서 작업한다면 [HANDOFF.md](HANDOFF.md)부터 읽는다.**
+> 현재 진행 상황, 비밀값 위치, 다음 할 일, 이미 겪은 함정이 정리돼 있다.
+
 ## 빠른 시작
 
 ```bash
