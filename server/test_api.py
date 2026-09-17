@@ -89,11 +89,14 @@ def main():
         s, b, _ = req("GET", "/conditions")
         assert s == 200 and len(b) == 1 and b[0]["label"] == "SW개발", b
 
-        # 무료 한도
-        for _ in range(api.FREE_CONDITIONS - 1):
+        # 무료 한도 (중복 테스트에서 하나 더 쓰므로 여유를 둔다)
+        api.FREE_CONDITIONS = 5
+        for _ in range(2):
             assert req("POST", "/conditions", {"lrg_clsfc": "ICT 서비스"})[0] == 201
+        api.FREE_CONDITIONS = 3
         s, b, _ = req("POST", "/conditions", {"lrg_clsfc": "ICT 서비스"})
         assert s == 402, (s, b)
+        api.FREE_CONDITIONS = 5
 
         # 유저 격리 — 다른 키는 남의 조건이 안 보인다
         s, b, _ = req("GET", "/conditions", key="user-b")
@@ -114,6 +117,16 @@ def main():
 
         s, b2, _ = req("GET", f"/notices?cond_id={cid}")
         assert {x["bid_ntce_nm"] for x in b2} == {"SW 개발 용역"}, b2
+
+        # 조건 2개에 동시에 걸린 공고가 중복으로 안 나온다
+        req("POST", "/conditions", {"label": "겹침", "lrg_clsfc": "ICT 서비스",
+                                    "mid_clsfc": "SW 및 시스템 개발"})
+        con = db.connect(); g2b.match(con); con.close()
+        s, dup, _ = req("GET", "/notices")
+        nos = [x["bid_ntce_no"] for x in dup]
+        assert len(nos) == len(set(nos)), f"공고 중복: {nos}"
+        assert any(x["labels"] and "," in x["labels"] for x in dup), \
+            "겹친 조건은 labels에 모여야 한다"
 
         # 남의 조건 id로는 못 본다
         s, b3, _ = req("GET", f"/notices?cond_id={cid}", key="user-b")
@@ -147,7 +160,7 @@ def main():
         except urllib.error.HTTPError as e:
             assert e.code == 400, e.code
 
-        print("통과. 엔드포인트 6종 · 검증 21건")
+        print("통과. 엔드포인트 7종 · 검증 24건")
     finally:
         srv.shutdown()
 

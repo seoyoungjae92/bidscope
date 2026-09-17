@@ -82,7 +82,7 @@ function Main({ conditions, notices, prespecs, error, onAdd, onReload }) {
 
       <section>
         <div className="row-head">
-          <h2>내 조건 {conditions.length}개</h2>
+          <h2>내 조건 <span className="count">{conditions.length}</span>개</h2>
           <button className="link" onClick={onAdd}>추가</button>
         </div>
         {conditions.map((c) => (
@@ -92,7 +92,8 @@ function Main({ conditions, notices, prespecs, error, onAdd, onReload }) {
               <span className="dim">{conditionSummary(c)}</span>
             </div>
             <button
-              className="link dim"
+              className="remove"
+              aria-label={`${c.label || '조건'} 삭제`}
               onClick={async () => { await api.delCondition(c.id); onReload(); }}
             >삭제</button>
           </div>
@@ -106,10 +107,10 @@ function Main({ conditions, notices, prespecs, error, onAdd, onReload }) {
       )}
 
       {prespecs.length > 0 && (
-        <section>
-          <h2>공고 예고 {prespecs.length}건</h2>
+        <section className="lead">
+          <h2>공고 예고 <span className="count">{prespecs.length}</span>건</h2>
           <p className="dim pad">
-            사전규격 단계예요. 보통 일주일쯤 뒤에 공고가 납니다.
+            사전규격 단계예요. 보통 일주일쯤 뒤에 공고가 나요.
           </p>
           {prespecs.map((p) => (
             <button
@@ -131,10 +132,10 @@ function Main({ conditions, notices, prespecs, error, onAdd, onReload }) {
       )}
 
       <section>
-        <h2>새 공고 {notices.length}건</h2>
+        <h2>새 공고 <span className="count">{notices.length}</span>건</h2>
         {notices.length === 0 && (
           <p className="dim pad">
-            아직 매칭된 공고가 없어요. 새로 올라오면 알려드릴게요.
+            새 공고가 올라오면 바로 알려드릴게요.
           </p>
         )}
         {notices.map((n) => {
@@ -162,8 +163,8 @@ function Main({ conditions, notices, prespecs, error, onAdd, onReload }) {
       {notices.length > 0 && <Banner />}
 
       <footer className="dim foot">
-        조달청 나라장터 공고를 기준으로 알려드려요.
-        한국전력·LH 등 자체 조달시스템 공고는 포함되지 않아요.
+        조달청 나라장터에 올라오는 공고를 알려드려요.
+        한국전력·LH처럼 자체 조달시스템을 쓰는 곳은 따로 확인해 주세요.
       </footer>
     </div>
   );
@@ -204,7 +205,7 @@ function NewCondition({ first, onDone, onCancel }) {
   const children = tree.find((t) => t.name === lrg)?.children ?? [];
 
   return (
-    <div className="page">
+    <div className="page has-bottom">
       <header className="top">
         <h1>{first ? '어떤 공고를 받을까요?' : '조건 추가'}</h1>
         <p className="sub">분야를 고르면 맞는 공고만 알려드려요</p>

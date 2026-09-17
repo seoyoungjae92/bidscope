@@ -132,10 +132,13 @@ def del_condition(con, req, m, q, body):
 def notices(con, req, m, q, body):
     """내 조건에 매칭된 공고. 마감 임박순, 마감분 제외."""
     uid = user_id(con, req)
+    # 조건 여러 개에 동시에 걸리면 같은 공고가 여러 행이 된다.
+    # cond_id/label을 select에 두면 distinct가 안 먹으므로 공고 단위로 묶는다.
     sql = """
-        select distinct n.bid_ntce_no, n.bid_ntce_nm, n.ntce_instt_nm, n.lrg_clsfc,
+        select n.bid_ntce_no, n.bid_ntce_nm, n.ntce_instt_nm, n.lrg_clsfc,
                n.mid_clsfc, n.cntrct_mthd, n.presmpt_prce, n.bid_ntce_dt,
-               n.bid_clse_dt, n.detail_url, c.id cond_id, c.label
+               n.bid_clse_dt, n.detail_url,
+               group_concat(distinct c.label) labels
           from notified t
           join condition c on c.id=t.condition_id and c.user_id=? and c.active=1
           join notice_latest n on n.bid_ntce_no=t.bid_ntce_no
@@ -144,7 +147,8 @@ def notices(con, req, m, q, body):
     if q.get("cond_id"):
         sql += " and c.id=?"
         args.append(int(q["cond_id"][0]))
-    sql += " order by (n.bid_clse_dt is null), n.bid_clse_dt limit ?"
+    sql += (" group by n.bid_ntce_no"
+            " order by (n.bid_clse_dt is null), n.bid_clse_dt limit ?")
     args.append(min(int((q.get("limit") or [30])[0]), 100))
     return [dict(r) for r in con.execute(sql, args)]
 
@@ -154,12 +158,14 @@ def prespecs(con, req, m, q, body):
     """내 조건에 걸린 사전규격(공고 예고). 의견 마감 임박순."""
     uid = user_id(con, req)
     return [dict(r) for r in con.execute("""
-        select distinct p.spec_no, p.spec_nm, p.order_instt, p.budget,
-               p.opnin_clse_dt, p.bid_ntce_no, p.doc_url, c.id cond_id, c.label
+        select p.spec_no, p.spec_nm, p.order_instt, p.budget,
+               p.opnin_clse_dt, p.bid_ntce_no, p.doc_url,
+               group_concat(distinct c.label) labels
           from prespec_notified t
           join condition c on c.id=t.condition_id and c.user_id=? and c.active=1
           join prespec   p on p.spec_no=t.spec_no
          where (p.opnin_clse_dt is null or p.opnin_clse_dt >= datetime('now','localtime'))
+         group by p.spec_no
          order by (p.opnin_clse_dt is null), p.opnin_clse_dt limit ?""",
         (uid, min(int((q.get("limit") or [30])[0]), 100)))]
 
