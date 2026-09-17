@@ -6,9 +6,15 @@
 import json
 import os
 import tempfile
+import time
 
 import db
 import g2b
+
+# 컨테이너는 UTC로 돈다. 공고 시각은 KST라 9시간 어긋나면
+# 이미 마감된 공고를 계속 알리게 된다.
+assert os.environ.get("TZ") == "Asia/Seoul", "g2b import가 TZ를 KST로 고정해야 한다"
+assert time.strftime("%z") == "+0900", f"KST가 아니다: {time.strftime('%z')}"
 
 NOTICES = [
     # (공고번호, 차수, 공고명, 대분류, 중분류, 계약방법, 추정가격)
@@ -193,7 +199,7 @@ def main():
     assert g2b.closing_digest(con) == {}, "미동의 유저는 마감 알림도 제외"
     assert g2b.prespec_digest(con) == {}, "미동의 유저는 사전규격도 제외"
 
-    print(f"통과. 조건 10종 · 공고 {len(NOTICES)}건 · 큐 {n1}건 · 마감임박 6종 · 사전규격 9종")
+    print(f"통과. 조건 10종 · 공고 {len(NOTICES)}건 · 큐 {n1}건 · 마감임박 6종 · 사전규격 9종 · TZ 2종")
 
 
 if __name__ == "__main__":

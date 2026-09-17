@@ -43,6 +43,11 @@ DAILY_CAP = 20
 CLOSING_MIN_H, CLOSING_MAX_H = 6, 48
 
 
+# 공고 시각은 KST. 컨테이너가 UTC면 매칭 창이 9시간 어긋난다.
+os.environ["TZ"] = "Asia/Seoul"   # 한국 공공조달이라 다른 값이 맞을 수 없다
+time.tzset()
+
+
 def _key():
     k = os.environ.get("G2B_KEY")
     if not k:

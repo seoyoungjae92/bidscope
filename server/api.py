@@ -10,7 +10,9 @@ import json
 import os
 import re
 import sys
+import time
 import traceback
+from datetime import datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
@@ -260,6 +262,14 @@ def main():
     # 서버가 죽었는지 로그만 안 나오는지 구분이 안 돼서 진단이 막힌다.
     sys.stdout.reconfigure(line_buffering=True)
     sys.stderr.reconfigure(line_buffering=True)
+
+    # 공고 시각은 전부 KST다. 컨테이너가 UTC면 마감 필터가 9시간 어긋나
+    # 이미 마감된 공고를 계속 보여준다. 프로세스 타임존을 못 박는다.
+    os.environ["TZ"] = "Asia/Seoul"   # 한국 공공조달이라 다른 값이 맞을 수 없다
+    time.tzset()
+    now = datetime.now()
+    print(f"[boot] TZ={os.environ['TZ']}  now={now:%Y-%m-%d %H:%M} "
+          f"(UTC면 9시간 차이가 난다)")
 
     raw_port = os.environ.get("PORT")
     port = int(raw_port or 8000)
