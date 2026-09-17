@@ -49,11 +49,30 @@ python3 test_match.py && python3 test_api.py
 빼면 같은 SQLite 파일을 볼 수 없다. 그래서 스케줄러를 API 프로세스 안에
 데몬 스레드로 넣었다(`scheduler.py`). 서비스 1개, 볼륨 1개로 끝난다.
 
+### GitHub 연동으로 배포 (권장)
+
+push할 때마다 자동 재배포된다.
+
+1. **railway.app → New Project → Deploy from GitHub repo → `bidscope`**
+   (비공개 저장소라 GitHub App 권한을 한 번 준다)
+2. **Settings → Root Directory: `server`**
+   ← 이걸 안 하면 Railway가 `miniapp/`을 보고 Node 프로젝트로 착각한다
+3. **Settings → Volumes → New Volume → Mount path `/data`**
+4. **Variables**에 아래 환경변수 입력
+5. **Settings → Networking → Generate Domain** → `xxx.up.railway.app`
+
+빌드 설정은 `server/railway.json`이 들고 있어서 따로 만질 게 없다
+(시작 명령, `/health` 헬스체크, 실패 시 재시작).
+
+<details><summary>CLI로 하려면</summary>
+
 ```bash
-railway init
-railway volume add --mount-path /data     # SQLite가 여기 산다
-railway up
+npm i -g @railway/cli
+railway login
+cd server && railway init && railway up
 ```
+볼륨과 환경변수는 대시보드에서 똑같이 설정한다.
+</details>
 
 **환경변수** (Railway 대시보드)
 ```
