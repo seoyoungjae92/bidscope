@@ -1,0 +1,2 @@
+/* 토스 네비게이션바를 쓰므로 여기선 리셋만. 확대·축소는 비활성(심사 항목). */
+html { -webkit-text-size-adjust: 100%; touch-action: manipulation; }

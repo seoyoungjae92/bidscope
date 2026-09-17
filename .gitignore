@@ -1,0 +1,17 @@
+# 의존성 / 빌드 산출물
+node_modules/
+dist/
+*.ait
+
+# 로컬 데이터 — 언제든 API에서 다시 만든다
+*.db
+*.db-wal
+*.db-shm
+log
+__pycache__/
+*.pyc
+
+# 비밀값
+.env
+.env.local
+*.pem
