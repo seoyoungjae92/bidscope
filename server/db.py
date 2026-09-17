@@ -106,11 +106,37 @@ select n.* from notice n
 """
 
 
+def _check(path):
+    """DB를 열기 전에 경로를 점검한다.
+
+    절대 경로의 상위 디렉터리가 없으면 만들지 않고 실패시킨다.
+    Railway 컨테이너는 root로 돌아서 /data를 그냥 만들 수 있는데,
+    그러면 볼륨이 아닌 컨테이너 디스크에 쓰게 되고 재배포마다
+    조용히 날아간다. 조용한 데이터 손실보다 시끄러운 실패가 낫다.
+    """
+    d = os.path.dirname(os.path.abspath(path))
+    if os.path.isdir(d):
+        return
+    if os.path.isabs(path):
+        raise SystemExit(
+            f"\n[bidscope] DB 디렉터리가 없어요: {d}\n"
+            f"  BIDNOTE_DB={path}\n"
+            f"  Railway라면 볼륨이 {d} 에 마운트됐는지 확인하세요.\n"
+            f"  (프로젝트 캔버스에서 Cmd+K → Volume → 서비스 선택 → "
+            f"마운트 경로 {d})\n"
+            f"  볼륨 없이 띄우려면 BIDNOTE_DB 변수를 지우세요 — 단 재배포마다 "
+            f"데이터가 사라집니다.\n")
+    os.makedirs(d, exist_ok=True)   # 상대 경로는 로컬 개발이므로 만들어 준다
+
+
 def connect(path=None):
-    con = sqlite3.connect(path or DB_PATH)
+    path = path or DB_PATH
+    _check(path)
+    con = sqlite3.connect(path)
     con.row_factory = sqlite3.Row
     con.execute("pragma journal_mode=WAL")
     con.execute("pragma foreign_keys=on")
+    con.execute("pragma busy_timeout=5000")  # 스케줄러와 API가 같은 파일을 쓴다
     return con
 
 
