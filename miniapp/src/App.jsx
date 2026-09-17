@@ -187,7 +187,8 @@ function NewCondition({ first, onDone, onCancel }) {
     setError(null);
     try {
       await api.addCondition({
-        label: (mid || lrg)?.slice(0, 12),
+        // 원본 분류명엔 '*' 구분자가 섞여 있다. 저장 전에 정리한다
+        label: lrg ? clsfcName(mid || lrg).slice(0, 12) : null,
         lrg_clsfc: lrg,
         mid_clsfc: mid,
         amt_min: amt.min,

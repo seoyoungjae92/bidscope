@@ -15,3 +15,7 @@ __pycache__/
 .env
 .env.local
 *.pem
+
+# 스크린샷 원본은 버전관리 대상이 아니다 (콘솔에 올리면 끝)
+shots/_sheet.png
+logo/_compare.png
