@@ -9,6 +9,7 @@
 import json
 import os
 import re
+import sys
 import traceback
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
@@ -255,11 +256,22 @@ class Handler(BaseHTTPRequestHandler):
 
 
 def main():
+    # 컨테이너에서 stdout이 블록 버퍼링되면 로그가 안 보인다.
+    # 서버가 죽었는지 로그만 안 나오는지 구분이 안 돼서 진단이 막힌다.
+    sys.stdout.reconfigure(line_buffering=True)
+    sys.stderr.reconfigure(line_buffering=True)
+
+    raw_port = os.environ.get("PORT")
+    port = int(raw_port or 8000)
+    print(f"[boot] PORT={raw_port!r} → {port}  DB={db.DB_PATH}  APP_NAME={APP_NAME}")
+
     db.init()
     scheduler.start()
-    port = int(os.environ.get("PORT", 8000))
-    print(f"bidscope api :{port}  (appName={APP_NAME})")
-    ThreadingHTTPServer(("0.0.0.0", port), Handler).serve_forever()
+
+    srv = ThreadingHTTPServer(("0.0.0.0", port), Handler)
+    host, bound = srv.server_address[:2]
+    print(f"[boot] listening on {host}:{bound}  — 준비 완료")
+    srv.serve_forever()
 
 
 if __name__ == "__main__":
