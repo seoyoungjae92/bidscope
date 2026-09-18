@@ -284,9 +284,9 @@ def main():
     # 이미 마감된 공고를 계속 보여준다. 프로세스 타임존을 못 박는다.
     os.environ["TZ"] = "Asia/Seoul"   # 한국 공공조달이라 다른 값이 맞을 수 없다
     time.tzset()
-    now = datetime.now()
-    print(f"[boot] TZ={os.environ['TZ']}  now={now:%Y-%m-%d %H:%M} "
-          f"(UTC면 9시간 차이가 난다)")
+    # tzdata가 없는 컨테이너에선 tzset()이 안 먹는다. 로그도 g2b.now_kst()로 찍는다.
+    print(f"[boot] KST now={g2b.now_kst():%Y-%m-%d %H:%M}  "
+          f"(naive now()={datetime.now():%H:%M})")
 
     raw_port = os.environ.get("PORT")
     port = int(raw_port or 8000)

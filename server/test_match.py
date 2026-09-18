@@ -247,7 +247,34 @@ def main():
     assert g2b.pending_digest(con) == {}, "신규 미동의"
     assert g2b.closing_digest(con) == {}, "마감 미동의"
 
-    print(f"통과. 조건 10종 · 공고 {len(NOTICES)}건 · 큐 {n1}건 · 마감임박 6종 · 사전규격 9종 · TZ 3종 · 변수 5종")
+    # 재시작으로 수집 슬롯을 건너뛰면 부팅 때 따라잡는다
+    import scheduler
+    from datetime import datetime, timedelta
+    ran = []
+    scheduler._run = lambda name: ran.append(name)
+    scheduler.db = db
+    def seed_cursor(hours_ago):
+        t = (datetime.now(scheduler.KST) - timedelta(hours=hours_ago)).strftime("%Y%m%d%H%M")
+        con.execute("insert into cursor(work_type,last_dt) values('용역',?) "
+                    "on conflict(work_type) do update set last_dt=excluded.last_dt", (t,))
+        con.commit()
+    # _catch_up이 연결을 닫으므로 close만 막은 대역을 준다
+    keep = type("Keep", (), {"execute": con.execute, "close": lambda s: None})()
+    real_connect, db.connect = db.connect, lambda *a, **k: keep
+    try:
+        scheduler._catch_up()
+        assert ran == ["collect"], "커서가 없으면 수집한다"
+        ran.clear()
+        seed_cursor(1)
+        scheduler._catch_up()
+        assert ran == [], "방금 수집했으면 안 돈다"
+        seed_cursor(scheduler.STALE_HOURS + 1)
+        scheduler._catch_up()
+        assert ran == ["collect"], "슬롯을 건너뛰었으면 따라잡는다"
+    finally:
+        db.connect = real_connect
+
+    print(f"통과. 조건 10종 · 공고 {len(NOTICES)}건 · 큐 {n1}건 · 마감임박 6종 · 사전규격 9종 · TZ 3종 · 변수 5종 · 부팅수집 3종")
 
 
 if __name__ == "__main__":

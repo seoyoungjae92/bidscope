@@ -65,21 +65,30 @@ def _next_at(now, hh, mm):
     return t if t > now else t + timedelta(days=1)
 
 
-def _seed_if_empty():
-    """빈 DB로 떴으면 한 번 수집한다.
+STALE_HOURS = 5   # 수집 간격이 최대 5시간(09→13→18)이라 그보다 오래됐으면 놓친 것이다
 
-    새로 배포하면 다음 스케줄(최대 몇 시간 뒤)까지 빈 화면이 된다.
-    볼륨 없이 돌리는 동안에는 재배포마다 비므로 더 필요하다.
+
+def _catch_up():
+    """부팅 시 커서가 오래됐으면 즉시 수집한다.
+
+    재배포·컨테이너 재시작이 수집 슬롯을 통째로 건너뛴다. 실제로
+    09:00 수집이 그렇게 빠졌다. 다음 슬롯까지 몇 시간을 비워 두지 않는다.
+    빈 DB(첫 배포)도 커서가 없으니 같은 경로로 처리된다.
     """
     import db
     con = db.connect()
     try:
-        n = con.execute("select count(*) c from notice").fetchone()["c"]
+        r = con.execute("select max(last_dt) d from cursor").fetchone()
     finally:
         con.close()
-    if n:
-        return
-    print("[scheduler] DB가 비어 있어요. 첫 수집을 시작합니다")
+    last = r and r["d"]
+    if last:
+        gap = datetime.now(KST) - datetime.strptime(last, "%Y%m%d%H%M").replace(tzinfo=KST)
+        if gap < timedelta(hours=STALE_HOURS):
+            return
+        print(f"[scheduler] 마지막 수집이 {gap.total_seconds()/3600:.1f}시간 전이에요. 따라잡습니다")
+    else:
+        print("[scheduler] 수집 기록이 없어요. 첫 수집을 시작합니다")
     try:
         _run("collect")
     except Exception:
@@ -87,7 +96,7 @@ def _seed_if_empty():
 
 
 def _loop():
-    _seed_if_empty()
+    _catch_up()
     # 재시작 직후 같은 슬롯을 다시 돌지 않도록, 시작 시각 이후 것만 예약한다
     while True:
         now = datetime.now(KST)
