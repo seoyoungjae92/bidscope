@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Device, Notification } from '@apps-in-toss/web-framework';
+import { Device } from '@apps-in-toss/web-framework';
 import * as api from './api';
 import Banner from './Banner';
+import { KINDS, askAgreement } from './push';
 import { clsfcName, conditionSummary, dday, money } from './format';
 import './App.css';
 
@@ -18,6 +19,7 @@ export default function App() {
   const [conditions, setConditions] = useState([]);
   const [notices, setNotices] = useState([]);
   const [prespecs, setPrespecs] = useState([]);
+  const [consent, setConsent] = useState({});
   const [error, setError] = useState(null);
 
   const load = useCallback(async () => {
@@ -25,9 +27,12 @@ export default function App() {
       const cs = await api.getConditions();
       setConditions(cs);
       if (cs.length === 0) return setView('new');
-      const [ns, ps] = await Promise.all([api.getNotices(), api.getPrespecs()]);
+      const [ns, ps, agreed] = await Promise.all([
+        api.getNotices(), api.getPrespecs(), api.getPushConsent(),
+      ]);
       setNotices(ns);
       setPrespecs(ps);
+      setConsent(agreed);
       setView('list');
     } catch (e) {
       setError(e.message);
@@ -50,6 +55,8 @@ export default function App() {
       conditions={conditions}
       notices={notices}
       prespecs={prespecs}
+      consent={consent}
+      onConsent={(c) => setConsent((p) => ({ ...p, ...c }))}
       error={error}
       onAdd={() => setView('new')}
       onReload={load}
@@ -57,18 +64,21 @@ export default function App() {
   );
 }
 
-function Main({ conditions, notices, prespecs, error, onAdd, onReload }) {
-  const [consent, setConsent] = useState(null);
+function Main({ conditions, notices, prespecs, consent, onConsent, error, onAdd, onReload }) {
+  const [asking, setAsking] = useState(false);
 
-  async function askPush() {
-    try {
-      const r = await Notification.requestAgreement({ templateCode: 'BIDNOTE_NEW' });
-      const ok = r === 'newAgreement' || r === 'alreadyAgreed';
-      await api.setPushConsent(ok);
-      setConsent(ok ? 'on' : 'off');
-    } catch {
-      setConsent('off');
+  /** 동의를 순서대로 묻는다. 동의문이 종류마다 따로라 시트도 따로 뜬다. */
+  async function ask(kinds) {
+    setAsking(true);
+    const got = {};
+    for (const kind of kinds) {
+      const { code } = KINDS.find((k) => k.kind === kind);
+      const ok = await askAgreement(code);
+      try { await api.setPushConsent(kind, ok); } catch { /* 저장 실패는 다음에 다시 묻는다 */ }
+      got[kind] = ok;
     }
+    onConsent(got);
+    setAsking(false);
   }
 
   return (
@@ -100,9 +110,10 @@ function Main({ conditions, notices, prespecs, error, onAdd, onReload }) {
         ))}
       </section>
 
-      {consent !== 'on' && (
-        <button className="cta" onClick={askPush}>
-          공고 올라오면 알림 받기
+      {(!consent.prespec || !consent.new) && (
+        <button className="cta" disabled={asking}
+                onClick={() => ask(['prespec', 'new'])}>
+          {asking ? '동의 확인 중…' : '공고 올라오면 알림 받기'}
         </button>
       )}
 
@@ -159,6 +170,13 @@ function Main({ conditions, notices, prespecs, error, onAdd, onReload }) {
           );
         })}
       </section>
+
+      {notices.length > 0 && consent.new && !consent.closing && (
+        <button className="cta ghost-cta" disabled={asking}
+                onClick={() => ask(['closing'])}>
+          마감이 다가오면 한 번 더 알림 받기
+        </button>
+      )}
 
       {notices.length > 0 && <Banner />}
 

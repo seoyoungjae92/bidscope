@@ -45,5 +45,6 @@ export const delCondition = (id) => call(`/conditions/${id}`, { method: 'DELETE'
 export const getNotices = (condId) =>
   call('/notices' + (condId ? `?cond_id=${condId}` : ''));
 export const getPrespecs = () => call('/prespecs');
-export const setPushConsent = (agreed) =>
-  call('/push-consent', { method: 'POST', body: { agreed } });
+export const getPushConsent = () => call('/push-consent');
+export const setPushConsent = (kind, agreed) =>
+  call('/push-consent', { method: 'POST', body: { kind, agreed } });

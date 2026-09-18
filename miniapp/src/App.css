@@ -133,3 +133,8 @@ section h2 .count { color: var(--blue); }
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; animation: none !important; }
 }
+
+/* 보조 CTA — 주 CTA와 경쟁하지 않게 톤을 낮춘다 */
+.cta.ghost-cta {
+  background: var(--blue-weak); color: #1b64da; font-size: 15px; padding: 14px;
+}
