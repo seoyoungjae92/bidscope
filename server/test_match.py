@@ -26,7 +26,28 @@ def _tz_check():
                 f"{f}에 localtime이 남아있다 (tzdata 없는 컨테이너에서 UTC로 폴백한다)"
 
 
+def _collect_window_check():
+    """나라장터 조회 구간이 KST인지.
+
+    naive datetime.now()를 쓰면 컨테이너(UTC)에서 9시간 전 구간을 조회해
+    공고가 9시간씩 늦게 들어온다. 에러 없이 조용히 늦어서 알아채기 어렵다.
+    """
+    from datetime import datetime, timedelta, timezone
+    want = datetime.now(timezone(timedelta(hours=9))).strftime("%Y%m%d%H%M")
+    got = g2b.now_kst().strftime("%Y%m%d%H%M")
+    assert got[:11] == want[:11], f"조회 구간이 KST가 아니다: {got} vs {want}"
+    # 주석·문서화 문자열이 아니라 실제 호출만 찾는다
+    import ast
+    tree = ast.parse(open("g2b.py").read())
+    for node in ast.walk(tree):
+        if (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
+                and node.func.attr == "now" and not node.args):
+            raise AssertionError(
+                f"g2b.py:{node.lineno} 에 naive datetime.now()가 있다 — now_kst()를 쓸 것")
+
+
 _tz_check()
+_collect_window_check()
 
 NOTICES = [
     # (공고번호, 차수, 공고명, 대분류, 중분류, 계약방법, 추정가격)
@@ -136,8 +157,8 @@ def main():
 
     # 창(6~48h) 안의 공고만 잡힌다
     def set_clse(no, hours):
-        con.execute("""update notice set bid_clse_dt =
-                       datetime('now','localtime',?) where bid_ntce_no=?""",
+        con.execute(f"""update notice set bid_clse_dt =
+                        datetime({db.KST},?) where bid_ntce_no=?""",
                     (f"{hours:+d} hours", no))
         con.commit()
     set_clse("A1", 24)    # 창 안
@@ -165,9 +186,9 @@ def main():
     def spec(no, nm, sw, budget, clse_hours):
         # '+' || -5 || ' hours' 는 '+-5 hours'가 되어 SQLite가 NULL을 준다.
         # 부호를 포함한 수정자를 통째로 넘긴다.
-        con.execute("""insert or replace into prespec
+        con.execute(f"""insert or replace into prespec
             (spec_no,work_type,spec_nm,sw_biz,budget,opnin_clse_dt,raw)
-            values (?,'용역',?,?,?, datetime('now','localtime',?),'{}')""",
+            values (?,'용역',?,?,?, datetime({db.KST},?),'{{}}')""",
             (no, nm, sw, budget, f"{clse_hours:+d} hours"))
         con.commit()
     spec("S1", "차세대 시스템 구축 사업", 1, 50_000_000, 72)     # SW · 의견창 열림
@@ -211,7 +232,7 @@ def main():
     assert g2b.closing_digest(con) == {}, "미동의 유저는 마감 알림도 제외"
     assert g2b.prespec_digest(con) == {}, "미동의 유저는 사전규격도 제외"
 
-    print(f"통과. 조건 10종 · 공고 {len(NOTICES)}건 · 큐 {n1}건 · 마감임박 6종 · 사전규격 9종 · TZ 2종")
+    print(f"통과. 조건 10종 · 공고 {len(NOTICES)}건 · 큐 {n1}건 · 마감임박 6종 · 사전규격 9종 · TZ 3종")
 
 
 if __name__ == "__main__":

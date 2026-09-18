@@ -13,7 +13,7 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 import db
 
@@ -44,8 +44,18 @@ CLOSING_MIN_H, CLOSING_MAX_H = 6, 48
 
 
 # 공고 시각은 KST. 컨테이너가 UTC면 매칭 창이 9시간 어긋난다.
-os.environ["TZ"] = "Asia/Seoul"   # 한국 공공조달이라 다른 값이 맞을 수 없다
+# 컨테이너에 tzdata가 없으면 TZ를 줘도 tzset()이 UTC로 폴백한다.
+# 그래서 시스템 타임존에 기대지 않고 오프셋을 직접 쓴다.
+os.environ["TZ"] = "Asia/Seoul"
 time.tzset()
+KST = timezone(timedelta(hours=9))
+
+
+def now_kst():
+    """나라장터 API의 조회 구간은 KST 기준이다.
+    naive datetime.now()를 쓰면 컨테이너(UTC)에서 9시간 전 구간을 조회해
+    공고가 9시간씩 늦게 들어온다."""
+    return datetime.now(KST)
 
 
 def _key():
@@ -120,7 +130,7 @@ def row_of(item, work_type):
 
 def collect(con, key):
     """커서 이후 신규 공고를 적재. 적재 건수 반환."""
-    now = datetime.now()
+    now = now_kst()
     end = now.strftime("%Y%m%d%H%M")
     inserted = 0
 
@@ -171,7 +181,7 @@ def collect_prespec(con, key):
     커서는 공고와 따로 둔다(work_type에 접미사). 한쪽이 실패해도
     다른 쪽 커서가 잘못 전진하지 않는다.
     """
-    now = datetime.now()
+    now = now_kst()
     end = now.strftime("%Y%m%d%H%M")
     total_got = 0
 

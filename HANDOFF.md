@@ -189,6 +189,7 @@ appName            bidscope          ← 변경 불가
 | 조건 등록했는데 빈 화면 | 배치가 최근 24시간만 매칭 | 등록 직후 `backfill_condition()` |
 | 같은 공고가 두 번 | `select`에 `cond_id`가 있어 `distinct` 무효 | 공고 단위 `group by` |
 | 화면이 통째로 죽음 | 토스 앱 밖에서 SDK가 **동기적으로** throw | `async` 래퍼로 감쌈 |
+| 공고가 9시간 늦게 들어옴 | 조회 구간에 naive `datetime.now()` (컨테이너 UTC) | `g2b.now_kst()` |
 | 로컬 개발 CORS 막힘 | 허용 오리진이 tossmini.com만 | `ALLOW_ORIGINS` 환경변수 (**운영에선 비운다**) |
 
 ---
