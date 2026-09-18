@@ -38,7 +38,8 @@ python3 test_match.py && python3 test_api.py
 | `DELETE` | `/conditions/{id}` | 조건 삭제 |
 | `GET` | `/notices?cond_id=&limit=` | 매칭 공고. 마감 임박순, 마감분 제외 |
 | `GET` | `/prespecs?limit=` | **공고 예고(사전규격).** 의견 마감 임박순 |
-| `POST` | `/push-consent` | `requestAgreement()` 결과 저장 |
+| `GET` | `/push-consent` | 종류별 동의 상태 |
+| `POST` | `/push-consent` | `requestAgreement()` 결과 저장. `{kind, agreed}` |
 
 ## 배포 (Railway)
 
@@ -131,9 +132,9 @@ ALLOW_ORIGINS=http://localhost:5180 PORT=8000 python3 api.py
 G2B_KEY=디코딩_인증키
 BIDNOTE_DB=/opt/bidnote/bidnote.db
 APP_NAME=bidscope
-TOSS_TEMPLATE_NEW=BIDNOTE_NEW
-TOSS_TEMPLATE_CLOSING=BIDNOTE_CLOSING
-TOSS_TEMPLATE_PRESPEC=BIDNOTE_PRESPEC
+TOSS_TEMPLATE_NEW=bidscope-...        # 콘솔 스마트발송의 발송 코드
+TOSS_TEMPLATE_CLOSING=bidscope-...
+TOSS_TEMPLATE_PRESPEC=bidscope-...
 TOSS_CERT=/opt/bidnote/toss-cert.pem
 TOSS_KEY=/opt/bidnote/toss-key.pem
 ```
@@ -190,6 +191,8 @@ api.example.com {
   분류명에서 토큰을 뽑아 매칭하는 것도 재봤는데 못 쓴다: `"사업"` 하나가 696건 중 186건을 잡고(거의 모든 공고명에 들어간다) `"연구조사"`·`"정보통신방송"`은 0건이다. 너무 넓거나 너무 좁다. **키워드를 받는 게 유일하게 정확한 축**이라 조건 등록 화면에서 이유와 함께 권한다.
 - **의견 마감이 지난 사전규격은 안 알린다.** 규격에 개입할 수 없으면 알릴 이유가 사라진다.
 - **마감 임박은 6~48시간 창에서만.** 더 임박하면 준비할 시간이 없고, 더 멀면 잊는다. 이미 신규 알림을 받은 공고만 대상이라 맥락 없는 알림이 안 나간다. 공고당 1회.
+- **제목·본문은 콘솔 템플릿이 갖는다.** 서버는 변수 값만 보낸다(`{{cond}}`, `{{n}}`, `{{name}}`, `{{t}}`). 템플릿이 25자 제한인데 변수가 치환되면 넘칠 수 있어서 `push.CAP_*`로 값을 잘라 보낸다. **콘솔 템플릿을 고치면 이 상한도 같이 고쳐야 한다.**
+- **알림 동의는 종류별로 받는다.** 동의문이 종류마다 따로라서 `push_new`/`push_prespec`/`push_closing`을 각각 본다. 예고만 동의하고 신규는 거절할 수 있다.
 - **푸시 일일 상한 20건.** 넘는 분량은 본문에 안 싣되 큐에서는 함께 소진한다(안 그러면 영영 안 끝난다).
 
 ## 아직 없는 것

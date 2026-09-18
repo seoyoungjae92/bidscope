@@ -73,7 +73,8 @@ def seed(con):
             (no, ord_, nm, lrg, mid, mthd, amt,
              "2020-01-01 00:00:00" if no == EXPIRED else None,
              json.dumps(item, ensure_ascii=False)))
-    con.execute("insert into app_user(id,toss_key,push_ok) values (1,'t1',1)")
+    con.execute("""insert into app_user(id,toss_key,push_ok,push_new,push_prespec,push_closing)
+                   values (1,'t1',1,1,1,1)""")
     con.commit()
 
 
@@ -173,14 +174,13 @@ def main():
     g2b.mark_closing_sent(con, [1])
     assert g2b.closing_digest(con) == {}, "마감 알림은 1회만"
 
-    # 렌더 길이 제한
-    m = push.render_closing({"items": [{"bid_ntce_nm": "가" * 60,
-                                        "bid_clse_dt": "2026-09-19 15:00:00",
-                                        "presmpt_prce": 0, "label": None}], "total": 1})
-    assert len(m["title"]) <= 7 and len(m["body"]) <= 25, m
-    assert "15:00" in m["body"], m
-    m2 = push.render_closing({"items": [{}] * 3, "total": 3})
-    assert len(m2["body"]) <= 25, m2
+    # 변수 값이 콘솔 템플릿 길이 예산 안에 들어가는지
+    v = push.vars_closing({"items": [{"bid_ntce_nm": "가" * 60,
+                                      "bid_clse_dt": "2026-09-19 15:00:00"}], "total": 1})
+    assert v["t"] == "15", v
+    rendered = f"{v['name']} {v['t']}시 마감이에요."
+    assert len(rendered) <= 25, f"{len(rendered)}자: {rendered}"
+    assert len(v["name"]) == push.CAP_NAME, "긴 이름은 상한까지 자른다"
 
     # ── 사전규격 ─────────────────────────────────────────────────────
     def spec(no, nm, sw, budget, clse_hours):
@@ -221,18 +221,33 @@ def main():
     g2b.mark_prespec_sent(con, [1])
     assert g2b.prespec_digest(con) == {}, "발송 후 큐가 빈다"
 
-    m3 = push.render_prespec({"items": [{"spec_nm": "가" * 50}], "total": 1})
-    assert len(m3["title"]) <= 7 and len(m3["body"]) <= 25, m3
-    m4 = push.render_prespec({"items": [{"spec_nm": "x"}] * 3, "total": 3})
-    assert len(m4["body"]) <= 25, m4
+    v3 = push.vars_prespec({"items": [{"spec_nm": "x"}] * 3, "total": 3})
+    assert len(f"관심 분야 {v3['n']}건 공고 예정이에요.") <= 25, v3
 
-    con.execute("update app_user set push_ok=0 where id=1")
+    # 신규: 조건 이름이 길어도 렌더 결과가 25자를 안 넘는다
+    v4 = push.vars_new({"items": [{"label": "가" * 20}] * 5, "total": 128})
+    r4 = f"{v4['cond']} 공고 {v4['n']}건 올라왔어요."
+    assert len(r4) <= 25, f"{len(r4)}자: {r4}"
+    assert len(v4["cond"]) == push.CAP_COND, "긴 조건명은 상한까지 자른다"
+    # 자른 끝에 공백이 남으면 '조건  공고'처럼 두 칸이 된다
+    v6 = push.vars_new({"items": [{"label": "SW 및 시스템 개발"}], "total": 3})
+    assert v6["cond"] == v6["cond"].rstrip(), f"끝 공백: {v6['cond']!r}"
+    assert "  " not in f"{v6['cond']} 공고 {v6['n']}건 올라왔어요.", v6
+    v5 = push.vars_new({"items": [{"label": "A"}, {"label": "B"}], "total": 2})
+    assert v5["cond"] == "내 조건", v5
+
+    # 종류별 동의 — 하나만 꺼도 그 종류만 빠진다
+    con.execute("update app_user set push_prespec=0 where id=1")
     con.commit()
-    assert g2b.pending_digest(con) == {}, "미동의 유저는 제외"
-    assert g2b.closing_digest(con) == {}, "미동의 유저는 마감 알림도 제외"
-    assert g2b.prespec_digest(con) == {}, "미동의 유저는 사전규격도 제외"
+    assert g2b.prespec_digest(con) == {}, "예고 미동의면 예고만 빠진다"
 
-    print(f"통과. 조건 10종 · 공고 {len(NOTICES)}건 · 큐 {n1}건 · 마감임박 6종 · 사전규격 9종 · TZ 3종")
+    con.execute("""update app_user set push_new=0, push_closing=0,
+                   push_prespec=1 where id=1""")
+    con.commit()
+    assert g2b.pending_digest(con) == {}, "신규 미동의"
+    assert g2b.closing_digest(con) == {}, "마감 미동의"
+
+    print(f"통과. 조건 10종 · 공고 {len(NOTICES)}건 · 큐 {n1}건 · 마감임박 6종 · 사전규격 9종 · TZ 3종 · 변수 5종")
 
 
 if __name__ == "__main__":

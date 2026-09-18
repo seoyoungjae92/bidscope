@@ -177,14 +177,31 @@ def prespecs(con, req, m, q, body):
         (uid, min(int((q.get("limit") or [30])[0]), 100)))]
 
 
+# 알림 종류별 동의. 동의문이 종류마다 따로 있어서 따로 받는다.
+PUSH_KINDS = {"new": "push_new", "prespec": "push_prespec", "closing": "push_closing"}
+
+
 @route("POST", "/push-consent")
 def push_consent(con, req, m, q, body):
-    """Notification.requestAgreement() 결과를 서버에 저장."""
+    """Notification.requestAgreement() 결과를 종류별로 저장."""
     uid = user_id(con, req)
-    con.execute("update app_user set push_ok=? where id=?",
-                (1 if body.get("agreed", True) else 0, uid))
+    kind = body.get("kind")
+    if kind not in PUSH_KINDS:
+        raise Err(422, f"kind는 {'/'.join(PUSH_KINDS)} 중 하나예요")
+    agreed = 1 if body.get("agreed", True) else 0
+    con.execute(f"update app_user set {PUSH_KINDS[kind]}=? where id=?", (agreed, uid))
     con.commit()
     return None, 204
+
+
+@route("GET", "/push-consent")
+def get_push_consent(con, req, m, q, body):
+    """어떤 알림에 동의했는지. 앱이 안 물어본 것만 묻게 한다."""
+    uid = user_id(con, req)
+    r = con.execute(
+        f"select {', '.join(PUSH_KINDS.values())} from app_user where id=?",
+        (uid,)).fetchone()
+    return {k: bool(r[col]) for k, col in PUSH_KINDS.items()}
 
 
 # ── 서버 ─────────────────────────────────────────────────────────────────

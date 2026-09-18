@@ -117,7 +117,7 @@ def main():
         # 배치 매칭 후에도 마감 지난 건은 빠진다
         import g2b
         con = db.connect()
-        con.execute("update app_user set push_ok=1")
+        con.execute("update app_user set push_ok=1, push_new=1, push_prespec=1, push_closing=1")
         con.commit()
         g2b.match(con)
         con.close()
@@ -144,11 +144,20 @@ def main():
         s, b3, _ = req("GET", f"/notices?cond_id={cid}", key="user-b")
         assert b3 == [], b3
 
-        # 푸시 동의
-        assert req("POST", "/push-consent", {"agreed": False})[0] == 204
+        # 푸시 동의 — 종류별로 따로 받는다
+        assert req("POST", "/push-consent", {"kind": "없는종류"})[0] == 422
+        assert req("POST", "/push-consent", {"agreed": True})[0] == 422   # kind 필수
+        assert req("POST", "/push-consent", {"kind": "prespec", "agreed": True})[0] == 204
+        assert req("POST", "/push-consent", {"kind": "new", "agreed": False})[0] == 204
+
+        s, c, _ = req("GET", "/push-consent")
+        # closing은 앞서 push_ok=1과 함께 켜둔 상태라 그대로 남는다
+        assert c["new"] is False and c["prespec"] is True, c
+
         con = db.connect()
-        assert con.execute("select push_ok from app_user where toss_key='user-a'"
-                           ).fetchone()["push_ok"] == 0
+        r = con.execute(
+            "select push_new, push_prespec from app_user where toss_key='user-a'").fetchone()
+        assert (r["push_new"], r["push_prespec"]) == (0, 1), dict(r)
         con.close()
 
         # 삭제 + 남의 것 삭제 불가
@@ -172,7 +181,7 @@ def main():
         except urllib.error.HTTPError as e:
             assert e.code == 400, e.code
 
-        print("통과. 엔드포인트 7종 · 검증 27건")
+        print("통과. 엔드포인트 8종 · 검증 33건")
     finally:
         srv.shutdown()
 

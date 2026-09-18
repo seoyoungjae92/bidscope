@@ -43,7 +43,11 @@ create table if not exists cursor (
 create table if not exists app_user (
   id         integer primary key autoincrement,
   toss_key   text unique not null,       -- 익명키 해시 또는 userKey
-  push_ok    integer not null default 0, -- 알림 동의 여부
+  push_ok    integer not null default 0, -- (구) 통합 동의. 아래 3종으로 대체
+  -- 알림 종류별 동의. 동의문이 종류별로 따로 있어서 따로 받는다.
+  push_new     integer not null default 0,
+  push_prespec integer not null default 0,
+  push_closing integer not null default 0,
   created_at text not null default (datetime('now','+9 hours'))
 );
 
@@ -149,6 +153,12 @@ def connect(path=None):
 # 기존 DB에 컬럼을 덧붙인다. create table if not exists는 컬럼을 추가하지 않는다.
 MIGRATIONS = [
     ("notified", "closing_sent_at", "alter table notified add column closing_sent_at text"),
+    ("app_user", "push_new",
+     "alter table app_user add column push_new integer not null default 0"),
+    ("app_user", "push_prespec",
+     "alter table app_user add column push_prespec integer not null default 0"),
+    ("app_user", "push_closing",
+     "alter table app_user add column push_closing integer not null default 0"),
     ("condition", "want_prespec",
      "alter table condition add column want_prespec integer not null default 1"),
 ]
@@ -161,6 +171,9 @@ def init(path=None):
         cols = {r["name"] for r in con.execute(f"pragma table_info({table})")}
         if column not in cols:
             con.execute(ddl)
+            # 기존에 통합 동의를 한 사람은 3종 모두 동의한 것으로 본다
+            if table == "app_user" and column.startswith("push_"):
+                con.execute(f"update app_user set {column}=1 where push_ok=1")
     con.commit()
     return con
 

@@ -279,7 +279,7 @@ def prespec_digest(con, cap=DAILY_CAP):
           join condition c on c.id = t.condition_id
           join app_user  u on u.id = c.user_id
           join prespec   p on p.spec_no = t.spec_no
-         where t.sent_at is null and u.push_ok = 1 and c.active = 1
+         where t.sent_at is null and u.push_prespec = 1 and c.active = 1
            and (p.opnin_clse_dt is null or p.opnin_clse_dt >= datetime('now','+9 hours'))
          order by u.id, p.opnin_clse_dt
     """).fetchall()
@@ -371,7 +371,7 @@ def pending_digest(con, cap=DAILY_CAP):
           join condition    c on c.id = t.condition_id
           join app_user     u on u.id = c.user_id
           join notice_latest n on n.bid_ntce_no = t.bid_ntce_no
-         where t.sent_at is null and u.push_ok = 1
+         where t.sent_at is null and u.push_new = 1
            and (n.bid_clse_dt is null or n.bid_clse_dt >= datetime('now','+9 hours'))
          order by u.id, (n.bid_clse_dt is null), n.bid_clse_dt
     """).fetchall()
@@ -399,7 +399,7 @@ def closing_digest(con, cap=DAILY_CAP):
           join notice_latest n on n.bid_ntce_no = t.bid_ntce_no
          where t.sent_at is not null
            and t.closing_sent_at is null
-           and u.push_ok = 1
+           and u.push_closing = 1
            and c.active = 1
            and n.bid_clse_dt is not null
            and n.bid_clse_dt >  datetime('now','+9 hours','+{CLOSING_MIN_H} hours')
