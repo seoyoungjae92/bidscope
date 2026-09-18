@@ -85,8 +85,11 @@ PUSH_SEND=                        # 템플릿 검수 통과 후 on
 TOSS_TEMPLATE_NEW=BIDSCOPE_NEW
 TOSS_TEMPLATE_CLOSING=BIDSCOPE_CLOSING
 TOSS_TEMPLATE_PRESPEC=BIDSCOPE_PRESPEC
-TOSS_CERT=/data/toss-cert.pem
-TOSS_KEY=/data/toss-key.pem
+# mTLS 인증서 — 둘 중 하나
+TOSS_CERT_B64=...        # base64. 부팅 때 임시 파일로 풀린다 (권장)
+TOSS_KEY_B64=...
+# TOSS_CERT=/data/toss-cert.pem    # 파일로 두려면 이쪽. 주면 B64보다 우선
+# TOSS_KEY=/data/toss-key.pem
 ALLOW_ORIGINS=                    # 운영에서는 비운다
 ```
 
@@ -197,6 +200,7 @@ api.example.com {
 
 ## 아직 없는 것
 
-- **푸시 실발송** — 콘솔에서 mTLS 인증서 발급 + 템플릿 검수 통과 후에 `--send`가 동작한다. 그 전까진 dry-run만.
+- **푸시 실발송** — `PUSH_SEND=on` 이어야 나간다. 그 전까진 dry-run.
+- **인증서는 base64 환경변수로 넣는다.** Railway 볼륨 SFTP(ssh.railway.com)가 막히는 환경이 있어서, `TOSS_CERT_B64`/`TOSS_KEY_B64`를 부팅 때 임시 파일로 푼다. 만료는 **2027-10-13** — 그 전에 콘솔에서 재발급해 교체할 것.
 - **구독(IAP)** — 무료 한도가 `api.FREE_CONDITIONS`에 하드코딩. 붙일 때 `app_user.plan` 컬럼으로 뺀다.
 - 모니터링(Healthchecks.io 핑), 로그 로테이션.

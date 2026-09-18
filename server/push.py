@@ -25,8 +25,34 @@ import g2b
 HOST = "apps-in-toss-api.toss.im"
 PATH = "/api-partner/v1/apps-in-toss/messenger/send-message"
 
-CERT = os.environ.get("TOSS_CERT")      # 클라이언트 인증서 (.pem)
-CERT_KEY = os.environ.get("TOSS_KEY")   # 개인키 (.pem)
+CERT = os.environ.get("TOSS_CERT")      # 클라이언트 인증서 경로
+CERT_KEY = os.environ.get("TOSS_KEY")   # 개인키 경로
+
+
+def _materialize():
+    """인증서를 환경변수(base64)에서 파일로 풀어 놓는다.
+
+    Railway 볼륨에 SFTP로 올리는 경로가 막히는 환경이 있어서,
+    TOSS_CERT_B64 / TOSS_KEY_B64 가 있으면 부팅 때마다 임시 파일로 쓴다.
+    파일 경로를 직접 주면(TOSS_CERT/TOSS_KEY) 그쪽이 우선이다.
+    """
+    global CERT, CERT_KEY
+    import base64
+    import tempfile
+    for env_b64, path_var in (("TOSS_CERT_B64", "CERT"), ("TOSS_KEY_B64", "CERT_KEY")):
+        raw = os.environ.get(env_b64)
+        if not raw or globals()[path_var]:
+            continue
+        d = os.path.join(tempfile.gettempdir(), "bidscope-mtls")
+        os.makedirs(d, mode=0o700, exist_ok=True)
+        f = os.path.join(d, "cert.pem" if path_var == "CERT" else "key.pem")
+        with open(f, "wb") as fp:
+            fp.write(base64.b64decode(raw))
+        os.chmod(f, 0o600)
+        globals()[path_var] = f
+
+
+_materialize()
 TEMPLATE_NEW = os.environ.get("TOSS_TEMPLATE_NEW", "")
 TEMPLATE_CLOSING = os.environ.get("TOSS_TEMPLATE_CLOSING", "")
 TEMPLATE_PRESPEC = os.environ.get("TOSS_TEMPLATE_PRESPEC", "")
