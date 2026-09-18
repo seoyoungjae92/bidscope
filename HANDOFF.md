@@ -1,6 +1,6 @@
 # 인수인계 — 다른 PC에서 이어서 하기
 
-마지막 갱신: 2026-09-17 · 토스 콘솔에 **앱 등록 검토 요청까지 완료**
+마지막 갱신: 2026-09-18 · 서버·푸시 준비 끝. **남은 건 실기기 테스트 → 출시 검토**
 
 ---
 
@@ -12,8 +12,9 @@
 | DB | ✅ 볼륨 `/data/bidscope.db` · 재배포에도 유지됨(검증 완료) |
 | 데이터 수집 | ✅ 09/13/18시 자동 (공고 + 사전규격) |
 | 미니앱 | ✅ 빌드 통과 · `bidscope.ait` 생성됨 |
-| 토스 콘솔 | ⏳ **앱 등록 검토 중** (1~2영업일) |
-| 푸시 | ⏸ dry-run만. mTLS 인증서 + 템플릿 검수 후 켠다 |
+| 토스 콘솔 | ✅ 앱 등록 · 푸시 템플릿 3종 · 알림동의문 3종 등록 완료 |
+| mTLS 인증서 | ✅ Railway 환경변수로 보관 (`CN=bidscope`, 만료 **2027-10-13**) |
+| 푸시 | ⏸ 코드·인증서 전부 준비됨. `PUSH_SEND=on`만 안 켰다 (실기기 확인 후) |
 | 구독(IAP) | ⏸ 안 함. 무료 출시 후 반응 보고 결정 |
 
 ---
@@ -95,39 +96,39 @@ railway variables         # 환경변수 확인
 ### ① 앱 등록 검토 결과 확인
 1~2영업일. 반려되면 사유를 보고 수정 후 재요청.
 
-### ② 푸시 템플릿 3종 검수 제출
-콘솔 → 스마트발송 → **기능성 캠페인**. 2~3영업일.
-제목 **7자**, 본문 **25자** 이내(공백 포함), 해요체.
+### ② 푸시 — 다 됐다. 켜기만 남았다
+
+콘솔 발송 코드가 그대로 Railway 변수에 들어가 있다. 앱의 알림 동의
+(`miniapp/src/push.js`)도 같은 코드를 쓴다 — **콘솔에서 코드를 바꾸면 양쪽 다** 고쳐야 한다.
 
 ```
-[새 입찰공고]  {키워드} 공고 {n}건 올라왔어요
-[공고 예고]    관심 분야 {n}건 공고 예정이에요
-[마감 임박]    {공고명} {시}시 마감이에요
+TOSS_TEMPLATE_NEW=bidscope-new
+TOSS_TEMPLATE_PRESPEC=bidscope-prespec
+TOSS_TEMPLATE_CLOSING=bidscope-closing
+TOSS_CERT_B64=...        ← 인증서(base64). 로컬 파일 보관 불필요
+TOSS_KEY_B64=...         ← 개인키(base64)
 ```
 
-알림동의문도 함께 등록해야 한다 — `Notification.requestAgreement()`가 이걸 참조한다.
+인증서는 `CN=bidscope`, **2027-10-13 만료**. Railway에만 있고 git에는 없다.
+새 PC에서 파일로 꺼내려면:
 
-승인되면 받은 `templateSetCode`를 Railway 변수에:
-```
-TOSS_TEMPLATE_NEW=...
-TOSS_TEMPLATE_CLOSING=...
-TOSS_TEMPLATE_PRESPEC=...
-```
-
-### ③ mTLS 인증서 발급
-콘솔에서 받아서 Railway 볼륨(`/data/`)에 올리고:
-```
-TOSS_CERT=/data/toss-cert.pem
-TOSS_KEY=/data/toss-key.pem
-PUSH_SEND=on          ← 이걸 켜야 실제 발송된다
-```
-
-켜기 전에 반드시 dry-run으로 문구를 눈으로 확인할 것:
 ```bash
-railway run python3 push.py        # --send 없이
+railway variables --kv | grep '^TOSS_CERT_B64=' | cut -d= -f2- | base64 -d > cert.pem
+railway variables --kv | grep '^TOSS_KEY_B64='  | cut -d= -f2- | base64 -d > key.pem
 ```
 
-### ④ 번들 업로드 + QR 실기기 테스트
+실기기에서 알림 수신을 확인한 뒤 마지막으로:
+
+```bash
+railway variables --set PUSH_SEND=on
+```
+
+켜기 전 문구 확인(발송 안 함):
+```bash
+railway run python3 server/push.py
+```
+
+### ③ 번들 업로드 + QR 실기기 테스트
 ```bash
 cd miniapp && npm run build        # → bidscope.ait
 ```
@@ -138,18 +139,18 @@ cd miniapp && npm run build        # → bidscope.ait
 - 테스트용 광고 키가 남아있지 않은지 ← 전체 점검 항목
   (`miniapp/.env`의 `VITE_AD_GROUP_ID`가 `ait-ad-test-banner-id`로 돼 있다.
    콘솔에서 운영 광고그룹 ID를 받아 교체할 것)
-- 실기기에서 푸시 수신
+- 실기기에서 푸시 수신 → 확인되면 `PUSH_SEND=on`
 
-### ⑤ 출시 검토 요청 → 출시
+### ④ 출시 검토 요청 → 출시
 최대 3영업일(카테고리에 따라 7일+). 승인되면 "출시하기"를 눌러야 실제로 나간다.
 
-### ⑥ 사업자등록 — 급하지 않다
+### ⑤ 사업자등록 — 급하지 않다
 출시·광고에는 필요 없다. 광고는 **누적 수익 5,000원까지 유예**되고,
 도달하면 5영업일 안에 등록하면 된다. IAP(구독)를 붙일 때 필수가 된다.
 등록 시 **업종이 앱 카테고리와 일치**해야 한다(소프트웨어 개발/정보서비스업).
 정산정보 심사가 별도로 2~3영업일.
 
-### ⑦ 출시 후
+### ⑥ 출시 후
 - 콘솔에서 **'핵심 지표'** 설정 — 토스가 이 지표로 유사 유저에게 추천한다.
   무료 유입이 사실상 이것뿐이라 중요하다. "주 1회 이상 방문" 정도가 적절.
 - 6주간 등록 사용자·리텐션만 본다. 구독은 그다음.
@@ -189,6 +190,7 @@ appName            bidscope          ← 변경 불가
 | 조건 등록했는데 빈 화면 | 배치가 최근 24시간만 매칭 | 등록 직후 `backfill_condition()` |
 | 같은 공고가 두 번 | `select`에 `cond_id`가 있어 `distinct` 무효 | 공고 단위 `group by` |
 | 화면이 통째로 죽음 | 토스 앱 밖에서 SDK가 **동기적으로** throw | `async` 래퍼로 감쌈 |
+| 알림 동의 시트가 안 뜸 | `templateCode`가 콘솔 **발송 코드**와 달랐다 | `push.js`의 `KINDS` = 콘솔 코드 |
 | 공고가 9시간 늦게 들어옴 | 조회 구간에 naive `datetime.now()` (컨테이너 UTC) | `g2b.now_kst()` |
 | 로컬 개발 CORS 막힘 | 허용 오리진이 tossmini.com만 | `ALLOW_ORIGINS` 환경변수 (**운영에선 비운다**) |
 
