@@ -14,6 +14,20 @@ const AMOUNTS = [
 ];
 const METHODS = ['전체', '수의계약', '제한경쟁', '일반경쟁'];
 
+/** 나라장터 원문을 기기 브라우저로 연다.
+ * Device.openURL은 문자열을 받는다 — 객체({ url })를 넘기면 아무 반응 없이 실패했다.
+ * 토스 앱 밖에서는 SDK가 동기적으로 던지므로 async로 감싸 window.open으로 넘긴다. */
+function openLink(url) {
+  if (!url || !/^https?:\/\//.test(url)) return;
+  (async () => {
+    try {
+      await Device.openURL(url);
+    } catch {
+      window.open(url, '_blank', 'noopener');
+    }
+  })();
+}
+
 export default function App() {
   const [view, setView] = useState('loading'); // loading | list | new
   const [conditions, setConditions] = useState([]);
@@ -132,7 +146,7 @@ function Main({ conditions, notices, prespecs, consent, onConsent, error, onAdd,
             <button
               key={p.spec_no}
               className="notice"
-              onClick={() => p.doc_url && Device.openURL({ url: p.doc_url })}
+              onClick={() => openLink(p.doc_url)}
             >
               <div className="notice-top">
                 <span className="badge pre">
@@ -160,7 +174,7 @@ function Main({ conditions, notices, prespecs, consent, onConsent, error, onAdd,
             <button
               key={n.bid_ntce_no}
               className="notice"
-              onClick={() => n.detail_url && Device.openURL({ url: n.detail_url })}
+              onClick={() => openLink(n.detail_url)}
             >
               <div className="notice-top">
                 <span className={d.urgent ? 'badge urgent' : 'badge'}>{d.text}</span>
