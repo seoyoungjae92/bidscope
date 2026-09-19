@@ -23,6 +23,7 @@ export default function App() {
   const [error, setError] = useState(null);
 
   const load = useCallback(async () => {
+    setError(null);
     try {
       const cs = await api.getConditions();
       setConditions(cs);
@@ -88,7 +89,11 @@ function Main({ conditions, notices, prespecs, consent, onConsent, error, onAdd,
         <p className="sub">공고 뜨기 전에 미리 알려드려요</p>
       </header>
 
-      {error && <p className="error">{error}</p>}
+      {error && (
+        <p className="error">
+          {error} <button className="link" onClick={onReload}>다시 시도</button>
+        </p>
+      )}
 
       <section>
         <div className="row-head">
@@ -198,7 +203,11 @@ function NewCondition({ first, onDone, onCancel }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
 
-  useEffect(() => { api.getClassifications().then(setTree).catch((e) => setError(e.message)); }, []);
+  const loadTree = useCallback(() => {
+    setError(null);
+    api.getClassifications().then(setTree).catch((e) => setError(e.message));
+  }, []);
+  useEffect(() => { loadTree(); }, [loadTree]);
 
   async function save() {
     setSaving(true);
@@ -221,7 +230,13 @@ function NewCondition({ first, onDone, onCancel }) {
     }
   }
 
-  if (!tree) return <div className="center">{error ?? '불러오는 중…'}</div>;
+  if (!tree) {
+    return (
+      <div className="center">
+        {error ? <>{error} <button className="link" onClick={loadTree}>다시 시도</button></> : '불러오는 중…'}
+      </div>
+    );
+  }
 
   const children = tree.find((t) => t.name === lrg)?.children ?? [];
 

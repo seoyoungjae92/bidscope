@@ -153,6 +153,9 @@ def run_batch(con, label, digests, make_vars, template, mark, send):
                 name = i.get("bid_ntce_nm") or i.get("spec_nm") or "?"
                 print(f"        · {name[:44]}")
             continue
+        # 익명키를 못 받은 기기의 임시 키(미니앱 api.js localKey). 토스가 모르는 키라 보낼 수 없다.
+        if d["toss_key"].startswith(("local-", "dev-")):
+            continue
         ok, resp = send_one(template, d["toss_key"], ctx)
         print(f"{head}  →  {'OK' if ok else 'FAIL ' + resp}")
         sent.append(uid) if ok else None
