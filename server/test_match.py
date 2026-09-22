@@ -274,7 +274,17 @@ def main():
     finally:
         db.connect = real_connect
 
-    print(f"통과. 조건 10종 · 공고 {len(NOTICES)}건 · 큐 {n1}건 · 마감임박 6종 · 사전규격 9종 · TZ 3종 · 변수 5종 · 부팅수집 3종")
+    # 스케줄러가 부르는 push 이름이 실제로 있는가.
+    # 2026-09-18 이름을 render_*에서 vars_*로 바꾸고 scheduler를 안 고쳐
+    # 푸시가 사흘간 AttributeError로 죽었다. 다시는 조용히 깨지지 않게 한다.
+    import ast, push as push_mod
+    tree = ast.parse(open("scheduler.py", encoding="utf-8").read())
+    used = {n.attr for n in ast.walk(tree)
+            if isinstance(n, ast.Attribute) and isinstance(n.value, ast.Name) and n.value.id == "push"}
+    missing = sorted(a for a in used if not hasattr(push_mod, a))
+    assert not missing, f"scheduler가 부르는데 push에 없는 이름: {missing}"
+
+    print(f"통과. 조건 10종 · 공고 {len(NOTICES)}건 · 큐 {n1}건 · 마감임박 6종 · 사전규격 9종 · TZ 3종 · 변수 5종 · 부팅수집 3종 · 스케줄러-푸시 연결")
 
 
 if __name__ == "__main__":

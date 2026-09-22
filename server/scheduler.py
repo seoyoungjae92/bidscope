@@ -47,14 +47,14 @@ def _run(name):
         elif name == "push":
             send = os.environ.get("PUSH_SEND") == "on"
             push.run_batch(con, "공고 예고", g2b.prespec_digest(con),
-                           push.render_prespec, push.TEMPLATE_PRESPEC,
+                           push.vars_prespec, push.TEMPLATE_PRESPEC,
                            g2b.mark_prespec_sent, send)
             push.run_batch(con, "신규 공고", g2b.pending_digest(con),
-                           push.render, push.TEMPLATE_NEW, g2b.mark_sent, send)
+                           push.vars_new, push.TEMPLATE_NEW, g2b.mark_sent, send)
         elif name == "push_closing":
             send = os.environ.get("PUSH_SEND") == "on"
             push.run_batch(con, "마감 임박", g2b.closing_digest(con),
-                           push.render_closing, push.TEMPLATE_CLOSING,
+                           push.vars_closing, push.TEMPLATE_CLOSING,
                            g2b.mark_closing_sent, send)
     finally:
         con.close()
