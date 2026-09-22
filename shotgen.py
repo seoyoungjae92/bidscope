@@ -4,7 +4,7 @@
 앱 화면을 날것으로 올리면 목록에서 읽히지 않는다. 검색 결과에 이미지가
 노출될 때 문구가 먼저 읽히도록, 캡처 위에 한 줄을 얹은 형태로 만든다.
 
-토스 규격: 세로 636×1048 PNG, 최소 3장.
+토스 규격: 세로 636×1048 PNG. 콘솔은 2장까지 받는다.
 의존성 0 — HTML을 쓰고 크롬 헤드리스로 렌더한다(PIL은 이 맥의 3.9에서 빌드가 안 된다).
 
 원본 캡처는 shots/raw/ 에 둔다. 앱 화면이 바뀌면 거기에 새로 캡처를 넣고
@@ -30,10 +30,13 @@ PANELS = [
     ("02-setup.png", "01-setup.png", "조건 등록",
      "분야만 고르면<br>끝이에요",
      "내 조건에 맞는 공고만 골라서 보여드려요"),
-    ("03-alert.png", "02-home.png", "알림",
-     "새 공고가 뜨면<br>알림으로",
-     "매일 아침 한 번. 마감 임박도 놓치지 않게"),
 ]
+
+# 3장을 만들었다가 2장으로 줄였다 — 콘솔이 2장까지만 받는다.
+# 뺀 것: ("03-alert.png", "02-home.png", "알림", "새 공고가 뜨면<br>알림으로",
+#         "매일 아침 한 번. 마감 임박도 놓치지 않게")
+# 원본 캡처(02-home)에 조건 라벨이 "여행*숙박*음식*운송"으로 찍혀 있다.
+# 새 캡처를 raw/에 넣으면 되살릴 수 있다.
 
 PAGE = """<!doctype html><html lang="ko"><head><meta charset="utf-8"><style>
   * {{ margin: 0; padding: 0; box-sizing: border-box; }}
@@ -62,7 +65,9 @@ PAGE = """<!doctype html><html lang="ko"><head><meta charset="utf-8"><style>
     border-radius: 26px 26px 0 0; overflow: hidden;
     background: #fff; box-shadow: 0 18px 48px rgba(16,42,86,.28);
   }}
-  .device img {{ width: 100%; display: block; }}
+  /* 캡처가 카드 모서리에 닿으면 답답하다. 안쪽에 여백을 준다 */
+  .device img {{ width: 100%; display: block; border-radius: 14px 14px 0 0; }}
+  .screen {{ padding: 20px 20px 0; }}
 </style></head><body>
   <div class="hero"></div>
   <div class="top">
@@ -70,7 +75,7 @@ PAGE = """<!doctype html><html lang="ko"><head><meta charset="utf-8"><style>
     <h1>{head}</h1>
     <p>{sub}</p>
   </div>
-  <div class="device"><img src="{img}"></div>
+  <div class="device"><div class="screen"><img src="{img}"></div></div>
 </body></html>"""
 
 
@@ -100,7 +105,7 @@ def main():
                         f"--screenshot={dst.resolve()}", page.as_uri()],
                        check=True, capture_output=True)
         print(f"  {dst}  {W}×{H}")
-    print("\n원본 캡처는 shots/raw/ 에 있어요. 콘솔엔 shots/0*.png 3장을 올려요.")
+    print("\n원본 캡처는 shots/raw/ 에 있어요. 콘솔엔 shots/0*.png 2장을 올려요.")
 
 
 if __name__ == "__main__":
