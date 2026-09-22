@@ -274,6 +274,43 @@ def main():
     finally:
         db.connect = real_connect
 
+    # 푸시 따라잡기: 기록이 없으면 보내고, 방금 보냈으면 안 보내고, 밤에는 안 보낸다
+    import types
+    ran.clear()
+    def at(hour):
+        real = scheduler.datetime
+        class FakeDT(real):
+            @classmethod
+            def now(cls, tz=None):
+                return real.now(tz).replace(hour=hour, minute=30)
+        return FakeDT
+    real_dt = scheduler.datetime
+    real_connect2, db.connect = db.connect, lambda *a, **k: keep
+    try:
+        scheduler.datetime = at(15)
+        scheduler._push_catch_up()
+        assert ran == ["push"], "푸시 기록이 없으면 밀린 것을 보낸다"
+        ran.clear()
+        con.execute("insert into cursor(work_type,last_dt) values(?,?) "
+                    "on conflict(work_type) do update set last_dt=excluded.last_dt",
+                    (scheduler.PUSH_KEY, real_dt.now(scheduler.KST).strftime("%Y%m%d%H%M")))
+        con.commit()
+        scheduler._push_catch_up()
+        assert ran == [], "방금 보냈으면 안 보낸다"
+        con.execute("update cursor set last_dt=? where work_type=?",
+                    ((real_dt.now(scheduler.KST) - timedelta(hours=scheduler.PUSH_STALE_HOURS + 1))
+                     .strftime("%Y%m%d%H%M"), scheduler.PUSH_KEY))
+        con.commit()
+        scheduler.datetime = at(23)
+        scheduler._push_catch_up()
+        assert ran == [], "밤에는 밀렸어도 안 보낸다"
+        scheduler.datetime = at(15)
+        scheduler._push_catch_up()
+        assert ran == ["push"], "낮이면 밀린 것을 보낸다"
+    finally:
+        scheduler.datetime = real_dt
+        db.connect = real_connect2
+
     # 스케줄러가 부르는 push 이름이 실제로 있는가.
     # 2026-09-18 이름을 render_*에서 vars_*로 바꾸고 scheduler를 안 고쳐
     # 푸시가 사흘간 AttributeError로 죽었다. 다시는 조용히 깨지지 않게 한다.
@@ -284,7 +321,7 @@ def main():
     missing = sorted(a for a in used if not hasattr(push_mod, a))
     assert not missing, f"scheduler가 부르는데 push에 없는 이름: {missing}"
 
-    print(f"통과. 조건 10종 · 공고 {len(NOTICES)}건 · 큐 {n1}건 · 마감임박 6종 · 사전규격 9종 · TZ 3종 · 변수 5종 · 부팅수집 3종 · 스케줄러-푸시 연결")
+    print(f"통과. 조건 10종 · 공고 {len(NOTICES)}건 · 큐 {n1}건 · 마감임박 6종 · 사전규격 9종 · TZ 3종 · 변수 5종 · 부팅수집 3종 · 푸시따라잡기 4종 · 스케줄러-푸시 연결")
 
 
 if __name__ == "__main__":

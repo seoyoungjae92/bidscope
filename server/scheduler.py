@@ -51,6 +51,10 @@ def _run(name):
                            g2b.mark_prespec_sent, send)
             push.run_batch(con, "신규 공고", g2b.pending_digest(con),
                            push.vars_new, push.TEMPLATE_NEW, g2b.mark_sent, send)
+            con.execute("insert into cursor(work_type,last_dt) values(?,?) "
+                        "on conflict(work_type) do update set last_dt=excluded.last_dt",
+                        (PUSH_KEY, datetime.now(KST).strftime("%Y%m%d%H%M")))
+            con.commit()
         elif name == "push_closing":
             send = os.environ.get("PUSH_SEND") == "on"
             push.run_batch(con, "마감 임박", g2b.closing_digest(con),
@@ -67,6 +71,12 @@ def _next_at(now, hh, mm):
 
 STALE_HOURS = 5   # 수집 간격이 최대 5시간(09→13→18)이라 그보다 오래됐으면 놓친 것이다
 
+# 푸시도 슬롯을 통째로 건너뛴다. 2026-09-20~22 사흘간 09:10 푸시가 죽은 채로 지나갔고
+# 큐만 쌓였다(공고 46 · 예고 26). 부팅 때 밀린 게 있으면 따라잡는다.
+PUSH_KEY = "@push"        # cursor 테이블에 섞이지 않게 @를 붙인다(수집 커서는 업무유형 이름)
+PUSH_STALE_HOURS = 20     # 하루 한 번(09:10)이라 20시간 넘게 비었으면 놓친 것이다
+PUSH_HOURS = (9, 21)      # 이 시간대에만 따라잡는다 — 밤에 알림이 울리면 안 된다
+
 
 def _catch_up():
     """부팅 시 커서가 오래됐으면 즉시 수집한다.
@@ -78,7 +88,8 @@ def _catch_up():
     import db
     con = db.connect()
     try:
-        r = con.execute("select max(last_dt) d from cursor").fetchone()
+        r = con.execute("select max(last_dt) d from cursor "
+                        "where work_type not like '@%'").fetchone()
     finally:
         con.close()
     last = r and r["d"]
@@ -95,8 +106,37 @@ def _catch_up():
         traceback.print_exc()
 
 
+def _push_catch_up():
+    """부팅 시 09:10 푸시를 놓쳤으면 즉시 한 번 보낸다.
+
+    수집과 달리 푸시는 사람 폰을 울리므로 조건을 좁게 둔다 —
+    하루 한 번 슬롯을 실제로 놓쳤을 때(PUSH_STALE_HOURS)만, 그리고 낮에만.
+    """
+    import db
+    con = db.connect()
+    try:
+        r = con.execute("select last_dt from cursor where work_type=?", (PUSH_KEY,)).fetchone()
+    finally:
+        con.close()
+    now = datetime.now(KST)
+    if not PUSH_HOURS[0] <= now.hour < PUSH_HOURS[1]:
+        return
+    if r and r["last_dt"]:
+        gap = now - datetime.strptime(r["last_dt"], "%Y%m%d%H%M").replace(tzinfo=KST)
+        if gap < timedelta(hours=PUSH_STALE_HOURS):
+            return
+        print(f"[scheduler] 마지막 푸시가 {gap.total_seconds()/3600:.1f}시간 전이에요. 따라잡습니다")
+    else:
+        print("[scheduler] 푸시 기록이 없어요. 밀린 알림을 보냅니다")
+    try:
+        _run("push")
+    except Exception:
+        traceback.print_exc()
+
+
 def _loop():
     _catch_up()
+    _push_catch_up()
     # 재시작 직후 같은 슬롯을 다시 돌지 않도록, 시작 시각 이후 것만 예약한다
     while True:
         now = datetime.now(KST)
