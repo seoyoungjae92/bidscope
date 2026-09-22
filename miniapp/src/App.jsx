@@ -80,11 +80,12 @@ export default function App() {
 }
 
 function Main({ conditions, notices, prespecs, consent, onConsent, error, onAdd, onReload }) {
-  const [asking, setAsking] = useState(false);
+  // 어떤 종류를 처리 중인지. 묶음 동의 중에는 true.
+  const [busy, setBusy] = useState(false);
 
   /** 동의를 순서대로 묻는다. 동의문이 종류마다 따로라 시트도 따로 뜬다. */
   async function ask(kinds) {
-    setAsking(true);
+    setBusy(true);
     const got = {};
     for (const kind of kinds) {
       const { code } = KINDS.find((k) => k.kind === kind);
@@ -93,7 +94,27 @@ function Main({ conditions, notices, prespecs, consent, onConsent, error, onAdd,
       got[kind] = ok;
     }
     onConsent(got);
-    setAsking(false);
+    setBusy(false);
+  }
+
+  /** 켜기는 토스 동의 시트를 다시 띄우고(이미 동의했으면 alreadyAgreed로 바로 켜진다),
+   *  끄기는 서버에만 알린다 — SDK에 동의 해제 함수가 없다. */
+  async function toggle(kind) {
+    const on = !!consent[kind];
+    setBusy(kind);
+    try {
+      if (on) {
+        await api.setPushConsent(kind, false);
+        onConsent({ [kind]: false });
+      } else {
+        const { code } = KINDS.find((k) => k.kind === kind);
+        const ok = await askAgreement(code);
+        try { await api.setPushConsent(kind, ok); } catch { /* 다음에 다시 묻는다 */ }
+        onConsent({ [kind]: ok });
+      }
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (
@@ -129,10 +150,10 @@ function Main({ conditions, notices, prespecs, consent, onConsent, error, onAdd,
         ))}
       </section>
 
-      {(!consent.prespec || !consent.new) && (
-        <button className="cta" disabled={asking}
+      {!KINDS.some((k) => consent[k.kind]) && (
+        <button className="cta" disabled={!!busy}
                 onClick={() => ask(['prespec', 'new'])}>
-          {asking ? '동의 확인 중…' : '공고 올라오면 알림 받기'}
+          {busy ? '동의 확인 중…' : '공고 올라오면 알림 받기'}
         </button>
       )}
 
@@ -190,11 +211,28 @@ function Main({ conditions, notices, prespecs, consent, onConsent, error, onAdd,
         })}
       </section>
 
-      {notices.length > 0 && consent.new && !consent.closing && (
-        <button className="cta ghost-cta" disabled={asking}
-                onClick={() => ask(['closing'])}>
-          마감이 다가오면 한 번 더 알림 받기
-        </button>
+      {KINDS.some((k) => consent[k.kind]) && (
+        <section>
+          <h2>알림</h2>
+          {KINDS.map((k) => {
+            const on = !!consent[k.kind];
+            return (
+              <button
+                key={k.kind}
+                className={on ? 'switch on' : 'switch'}
+                disabled={busy === k.kind}
+                aria-pressed={on}
+                onClick={() => toggle(k.kind)}
+              >
+                <span>{k.label}</span>
+                <span className="state">
+                  {busy === k.kind ? '…' : on ? '받는 중' : '꺼짐'}
+                </span>
+              </button>
+            );
+          })}
+          <p className="dim pad">눌러서 끄고 켤 수 있어요. 알림은 하루 한 번 모아서 보내요.</p>
+        </section>
       )}
 
       {notices.length > 0 && <Banner />}

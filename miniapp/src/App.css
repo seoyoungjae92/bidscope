@@ -66,6 +66,22 @@ section h2 .count { color: var(--blue); }
 /* 파괴적 액션은 눈에 덜 띄게. 라벨로 무엇이 지워지는지 읽히게 한다 */
 .cond .remove { color: var(--dim); font-size: 14px; padding: 8px; flex: none; }
 
+/* 알림 켜고 끄기. 켜진 것이 기본이라 꺼짐을 눈에 덜 띄게 둔다 */
+.switch {
+  display: flex; justify-content: space-between; align-items: center;
+  width: 100%; gap: 12px; padding: 14px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 16px; color: var(--ink); text-align: left;
+}
+.switch:last-of-type { border-bottom: 0; }
+.switch .state {
+  flex: none; padding: 5px 12px; border-radius: 999px;
+  background: var(--line); color: var(--dim);
+  font-size: 14px; font-weight: 600;
+}
+.switch.on .state { background: var(--blue-weak); color: var(--blue); }
+.switch:disabled { opacity: .5; }
+
 /* 공고 */
 .notice {
   display: block; width: 100%; text-align: left;
