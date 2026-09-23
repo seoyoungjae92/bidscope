@@ -157,6 +157,30 @@ function Main({ conditions, notices, prespecs, consent, onConsent, error, onAdd,
         </button>
       )}
 
+      {KINDS.some((k) => consent[k.kind]) && (
+        <section>
+          <h2>알림</h2>
+          {KINDS.map((k) => {
+            const on = !!consent[k.kind];
+            return (
+              <button
+                key={k.kind}
+                className={on ? 'switch on' : 'switch'}
+                disabled={busy === k.kind}
+                aria-pressed={on}
+                onClick={() => toggle(k.kind)}
+              >
+                <span>{k.label}</span>
+                <span className="state">
+                  {busy === k.kind ? '…' : on ? '받는 중' : '꺼짐'}
+                </span>
+              </button>
+            );
+          })}
+          <p className="dim pad">눌러서 끄고 켤 수 있어요. 알림은 하루 한 번 모아서 보내요.</p>
+        </section>
+      )}
+
       {prespecs.length > 0 && (
         <section className="lead">
           <h2>공고 예고 <span className="count">{prespecs.length}</span>건</h2>
@@ -181,6 +205,10 @@ function Main({ conditions, notices, prespecs, consent, onConsent, error, onAdd,
           ))}
         </section>
       )}
+
+      {/* 예고와 새 공고 사이. 목록 맨 아래보다 눈에 들어오고,
+          화면당 배너는 하나만 둔다(같은 포맷 2개 이상 배치 금지) */}
+      {notices.length > 0 && <Banner />}
 
       <section>
         <h2>새 공고 <span className="count">{notices.length}</span>건</h2>
@@ -211,31 +239,7 @@ function Main({ conditions, notices, prespecs, consent, onConsent, error, onAdd,
         })}
       </section>
 
-      {KINDS.some((k) => consent[k.kind]) && (
-        <section>
-          <h2>알림</h2>
-          {KINDS.map((k) => {
-            const on = !!consent[k.kind];
-            return (
-              <button
-                key={k.kind}
-                className={on ? 'switch on' : 'switch'}
-                disabled={busy === k.kind}
-                aria-pressed={on}
-                onClick={() => toggle(k.kind)}
-              >
-                <span>{k.label}</span>
-                <span className="state">
-                  {busy === k.kind ? '…' : on ? '받는 중' : '꺼짐'}
-                </span>
-              </button>
-            );
-          })}
-          <p className="dim pad">눌러서 끄고 켤 수 있어요. 알림은 하루 한 번 모아서 보내요.</p>
-        </section>
-      )}
 
-      {notices.length > 0 && <Banner />}
 
       <footer className="dim foot">
         조달청 나라장터에 올라오는 공고를 알려드려요.
