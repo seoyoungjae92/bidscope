@@ -1,6 +1,6 @@
 # 인수인계 — 다른 PC에서 이어서 하기
 
-마지막 갱신: 2026-09-19 · 새 노트북으로 이전. 1차 심사 반려 → 수정 번들 재검토 중
+마지막 갱신: 2026-09-24 · **출시 완료(2026-09-22)**. 푸시 발송 중. 배너 광고 연결.
 
 ---
 
@@ -131,10 +131,11 @@ railway variables --set TOSS_CERT_B64="$(base64 -i 새인증서.pem)" \
       `railway variables --set G2B_KEY="$(pbpaste)" && pbcopy < /dev/null`
 - [ ] **이전 mTLS 인증서 `bidscope` 폐기** — 새 인증서로 첫 푸시 수신 확인 후
 
-### ① 앱 등록 검토 결과 확인
-1~2영업일. 반려되면 사유를 보고 수정 후 재요청.
+### ① 앱 등록·출시 — 완료 (2026-09-22)
+1차 반려(최초 접속 20초 초과 / 메인 스킴 접속 불가) → 타임아웃 수정 후 승인·출시.
 
-### ② 푸시 — 다 됐다. 켜기만 남았다
+### ② 푸시 — 동작 확인 완료 (2026-09-22)
+매일 09:10 신규·예고, 15:00 마감 임박. 발송 결과는 `railway logs`에서 `[신규 공고]`로 찾는다.
 
 콘솔 발송 코드가 그대로 Railway 변수에 들어가 있다. 앱의 알림 동의
 (`miniapp/src/push.js`)도 같은 코드를 쓴다 — **콘솔에서 코드를 바꾸면 양쪽 다** 고쳐야 한다.
@@ -155,16 +156,10 @@ railway variables --kv | grep '^TOSS_CERT_B64=' | cut -d= -f2- | base64 -d > cer
 railway variables --kv | grep '^TOSS_KEY_B64='  | cut -d= -f2- | base64 -d > key.pem
 ```
 
-실기기에서 알림 수신을 확인한 뒤 마지막으로:
+`PUSH_SEND=on`은 이미 켜져 있다. 끄려면 `railway variable delete PUSH_SEND`.
 
-```bash
-railway variables --set PUSH_SEND=on
-```
-
-켜기 전 문구 확인(발송 안 함):
-```bash
-railway run python3 server/push.py
-```
+⚠️ 발송 경로는 조용히 깨지기 쉽다 — 2026-09-18에 `push.py` 함수 이름을 바꾸고
+`scheduler.py`를 안 고쳐 사흘간 AttributeError로 죽었다. `test_match.py`가 이제 그 연결을 검사한다.
 
 ### ③ 번들 업로드 + QR 실기기 테스트
 ```bash
@@ -176,10 +171,9 @@ cd miniapp && npm run build        # → bidscope.ait
 - 뒤로가기 동작
 - 실기기에서 푸시 수신 → 확인되면 `PUSH_SEND=on`
 
-> **광고 없이 출시한다 (2026-09-19 결정).** 콘솔 약관 등록에서 사업자번호를 요구해
-> 막혔다(공식 문서상으로는 5,000원까지 유예다 — ⑤ 참고). 광고 수익은 초반에 어차피
-> 0에 가까우니 출시를 미루지 않기로 했다. `VITE_AD_GROUP_ID`를 비워두면
-> `Banner.jsx`가 배너를 아예 그리지 않으니 코드 수정은 필요 없다.
+> **광고는 2026-09-24에 붙였다.** 콘솔 인앱 광고 → 배너 → **문구 강조** 로 광고그룹을 만들고
+> ID를 `.env`의 `VITE_AD_GROUP_ID`에 넣는다. "문구 강조"는 코드 옵션이 아니라 콘솔 설정값이다
+> (코드의 `variant`는 `card`/`expanded` 둘뿐이고 `card`를 쓴다).
 > 테스트 키(`ait-ad-test-banner-id`)가 번들에 남으면 **전체 점검에서 반려**되니
 > 빌드 후 `grep -r ait-ad-test dist/`로 한 번 확인할 것.
 
@@ -222,7 +216,7 @@ appName            bidscope          ← 변경 불가
 부제               공공입찰 미리 알림
 앱 로고            logo/logo-light.png
 다크모드 로고       logo/logo-dark.png
-스크린샷           shots/01-setup, 02-home, 03-notices
+스크린샷           shots/01-lead.png, 02-setup.png  ← 콘솔은 2장까지. `python3 shotgen.py`로 생성
 검색 키워드         입찰, 나라장터, 공고, 조달, 입찰공고, 공공입찰,
                   관급, 수의계약, 사전규격, 용역
 고객문의           seoyoungjae92@gmail.com
