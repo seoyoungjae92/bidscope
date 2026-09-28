@@ -242,6 +242,7 @@ appName            bidscope          ← 변경 불가
 | 심사 반려 「최초 접속 20초 초과」 + 「메인 스킴 접속 불가」 | 익명키·fetch에 타임아웃이 없어 심사 환경에서 첫 화면이 "불러오는 중…"에 무한정 멈춤 | `api.js` 익명키 3초·요청 5초 상한, 실패 시 "다시 시도" 버튼 (2026-09-19) |
 | 익명키 실패한 사용자끼리 조건이 섞임 | 실패 시 모두 같은 `'dev-local-key'`로 떨어졌다 | 운영에선 기기별 임의 키(`local-…`, localStorage). 푸시는 이 키를 건너뛴다 |
 | 공고를 눌러도 아무 반응 없음 | `Device.openURL({ url })` — SDK는 **문자열**을 받는다(`openURL(url: string)`) | `App.jsx`의 `openLink(url)` 하나로 모음 (2026-09-19) |
+| 첫 진입에만 배너가 안 뜨고 빈칸 | `TossAds.initialize()`가 비동기인데 바로 `attachBanner`를 불렀다. 화면을 나갔다 오면 이미 초기화돼 있어 붙는다 | `onInitialized`를 기다리는 약속 하나를 앱 전체가 공유. 높이는 `onAdRendered` 뒤에 준다 (2026-09-29) |
 | 로컬 개발 CORS 막힘 | 허용 오리진이 tossmini.com만 | `ALLOW_ORIGINS` 환경변수 (**운영에선 비운다**) |
 
 ---

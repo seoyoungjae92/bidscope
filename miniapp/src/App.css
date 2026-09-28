@@ -143,8 +143,11 @@ section h2 .count { color: var(--blue); }
 .bottom .cta { flex: 1; margin: 0; }
 .has-bottom { padding-bottom: 104px; }
 
-/* 광고 — 버튼과 충분히 띄운다(오탭 유도 금지) */
-.banner { margin: 28px 0 8px; min-height: 96px; }
+/* 광고 — 버튼과 충분히 띄운다(오탭 유도 금지).
+   붙기 전에는 자리를 잡지 않는다. 미리 높이를 주면 광고가 안 채워졌을 때
+   빈 여백만 남는다(2026-09-29). 실제로 그려진 뒤에 .shown이 붙는다. */
+.banner { margin: 0; min-height: 0; }
+.banner.shown { margin: 28px 0 8px; min-height: 96px; }
 
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; animation: none !important; }
