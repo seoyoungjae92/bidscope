@@ -68,15 +68,19 @@ export default function Banner() {
     };
   }, [adGroupId]);
 
-  // 광고가 안 뜨면 빈 칸을 남기지 않는다 (데드엔드 UI 금지).
-  // 붙기 전에도 자리를 잡아두지 않는다 — 안 채워지면 빈 여백만 남는다.
-  // 라벨은 그려진 뒤에 광고와 함께 나타난다 — "예상하기 어려운 시점에 노출된다"는
-  // 반려(2026-09-29)에 대한 대응이라 광고보다 먼저 읽히는 자리에 둔다.
+  // 자리를 미리 잡고 "광고"를 먼저 보여준 뒤, 그 안에서 광고가 채워진다.
+  //
+  // 처음에는 반대로 했다 — 그려진 뒤에 자리를 잡게 하니 화면이 다 뜬 다음
+  // 광고가 툭 나타나 아래 내용을 밀어냈다. 체크리스트의 "사용자가 예상하기
+  // 어려운 순간에 노출하지 않아요" / "사전에 로딩돼 있어요"에 걸려 두 번 반려됐다
+  // (2026-09-29). 빈 칸이 남는 것보다 갑자기 나타나는 쪽이 더 문제였다.
+  //
+  // 안 채워지면(onNoFill) 영역째 사라진다 — 빈 상자를 남기지 않는다.
   if (state === 'failed') return null;
   return (
-    <>
-      {state === 'shown' && <p className="ad-label">광고</p>}
-      <div className={state === 'shown' ? 'banner shown' : 'banner'} ref={ref} />
-    </>
+    <div className="ad">
+      <p className="ad-label">광고</p>
+      <div className="banner" ref={ref} />
+    </div>
   );
 }
