@@ -70,6 +70,13 @@ export default function Banner() {
 
   // 광고가 안 뜨면 빈 칸을 남기지 않는다 (데드엔드 UI 금지).
   // 붙기 전에도 자리를 잡아두지 않는다 — 안 채워지면 빈 여백만 남는다.
+  // 라벨은 그려진 뒤에 광고와 함께 나타난다 — "예상하기 어려운 시점에 노출된다"는
+  // 반려(2026-09-29)에 대한 대응이라 광고보다 먼저 읽히는 자리에 둔다.
   if (state === 'failed') return null;
-  return <div className={state === 'shown' ? 'banner shown' : 'banner'} ref={ref} />;
+  return (
+    <>
+      {state === 'shown' && <p className="ad-label">광고</p>}
+      <div className={state === 'shown' ? 'banner shown' : 'banner'} ref={ref} />
+    </>
+  );
 }

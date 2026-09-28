@@ -57,12 +57,32 @@ export default function App() {
 
   useEffect(() => { load(); }, [load]);
 
+  /* 조건 추가는 화면 전환이 아니라 상태만 바꾸는 구조라, 뒤로가기가
+   * 앱을 통째로 닫았다(심사 반려 2026-09-29). 히스토리에 한 칸 쌓아
+   * 뒤로가기가 목록으로 돌아오게 한다. 첫 화면(조건이 없어 바로 등록 화면인 경우)은
+   * 쌓지 않는다 — 최초 화면에서 뒤로가기는 종료가 맞다. */
+  useEffect(() => {
+    const onPop = () => setView((v) => (v === 'new' ? 'list' : v));
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, []);
+
+  const openNew = useCallback(() => {
+    window.history.pushState({ bidscope: 'new' }, '');
+    setView('new');
+  }, []);
+
+  const closeNew = useCallback(() => {
+    if (window.history.state?.bidscope === 'new') window.history.back();
+    else setView('list');
+  }, []);
+
   if (view === 'loading') return <div className="center">불러오는 중…</div>;
   if (view === 'new') {
     return <NewCondition
       first={conditions.length === 0}
-      onDone={load}
-      onCancel={conditions.length ? () => setView('list') : null}
+      onDone={() => { closeNew(); load(); }}
+      onCancel={conditions.length ? closeNew : null}
     />;
   }
   return (
@@ -73,7 +93,7 @@ export default function App() {
       consent={consent}
       onConsent={(c) => setConsent((p) => ({ ...p, ...c }))}
       error={error}
-      onAdd={() => setView('new')}
+      onAdd={openNew}
       onReload={load}
     />
   );
@@ -206,10 +226,6 @@ function Main({ conditions, notices, prespecs, consent, onConsent, error, onAdd,
         </section>
       )}
 
-      {/* 예고와 새 공고 사이. 목록 맨 아래보다 눈에 들어오고,
-          화면당 배너는 하나만 둔다(같은 포맷 2개 이상 배치 금지) */}
-      {notices.length > 0 && <Banner />}
-
       <section>
         <h2>새 공고 <span className="count">{notices.length}</span>건</h2>
         {notices.length === 0 && (
@@ -238,6 +254,10 @@ function Main({ conditions, notices, prespecs, consent, onConsent, error, onAdd,
           );
         })}
       </section>
+
+      {/* 목록을 다 읽은 뒤에 온다. 사이에 끼우면 "예상하기 어려운 시점"으로
+          반려된다(2026-09-29). 화면당 배너는 하나만 둔다 */}
+      {notices.length > 0 && <Banner />}
 
 
 

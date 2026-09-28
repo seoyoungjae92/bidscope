@@ -243,6 +243,8 @@ appName            bidscope          ← 변경 불가
 | 익명키 실패한 사용자끼리 조건이 섞임 | 실패 시 모두 같은 `'dev-local-key'`로 떨어졌다 | 운영에선 기기별 임의 키(`local-…`, localStorage). 푸시는 이 키를 건너뛴다 |
 | 공고를 눌러도 아무 반응 없음 | `Device.openURL({ url })` — SDK는 **문자열**을 받는다(`openURL(url: string)`) | `App.jsx`의 `openLink(url)` 하나로 모음 (2026-09-19) |
 | 첫 진입에만 배너가 안 뜨고 빈칸 | `TossAds.initialize()`가 비동기인데 바로 `attachBanner`를 불렀다. 화면을 나갔다 오면 이미 초기화돼 있어 붙는다 | `onInitialized`를 기다리는 약속 하나를 앱 전체가 공유. 높이는 `onAdRendered` 뒤에 준다 (2026-09-29) |
+| 심사 반려 「뒤로가기 시 미니앱 종료」 | 조건 추가가 화면 전환이 아니라 상태값만 바꿔 히스토리가 없었다 | `openNew`에서 `history.pushState`, `popstate`로 목록 복귀 (2026-09-29) |
+| 심사 반려 「예상하기 어려운 시점에 광고 노출」 | 배너를 공고 예고와 새 공고 **사이**에 끼웠다 | 목록 맨 아래로 되돌리고 광고 위에 "광고" 라벨을 붙였다 (2026-09-29) |
 | 로컬 개발 CORS 막힘 | 허용 오리진이 tossmini.com만 | `ALLOW_ORIGINS` 환경변수 (**운영에선 비운다**) |
 
 ---
