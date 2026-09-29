@@ -55,7 +55,7 @@ python3 test_match.py && python3 test_api.py
 push할 때마다 자동 재배포된다.
 
 1. **railway.app → New Project → Deploy from GitHub repo → `bidscope`**
-   (비공개 저장소라 GitHub App 권한을 한 번 준다)
+   (처음 한 번 GitHub App 권한을 준다)
 2. **Settings → Root Directory: `server`**
    ← 이걸 안 하면 Railway가 `miniapp/`을 보고 Node 프로젝트로 착각한다
 3. **Settings → Volumes → New Volume → Mount path `/data`**

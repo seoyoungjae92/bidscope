@@ -29,7 +29,7 @@ git clone https://github.com/seoyoungjae92/bidscope.git
 cd bidscope
 ```
 
-비공개 저장소다. GitHub 계정 `seoyoungjae92`로 로그인돼 있어야 한다.
+push하려면 GitHub 계정 `seoyoungjae92`로 로그인돼 있어야 한다.
 
 ### 2. 필요한 것
 
@@ -99,7 +99,7 @@ railway variables         # 환경변수 확인
 
 | 계정 | 없으면 |
 |---|---|
-| GitHub `seoyoungjae92` | 소스가 **여기에만** 있다 (비공개 저장소) |
+| GitHub `seoyoungjae92` | 소스가 **여기에만** 있다 |
 | Railway | mTLS 개인키·공공데이터 인증키가 **여기에만** 있다 |
 | 토스 콘솔 | 앱·푸시 템플릿 |
 | data.go.kr | 인증키 (재발급은 가능) |
