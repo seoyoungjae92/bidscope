@@ -255,16 +255,16 @@ function Main({ conditions, notices, prespecs, consent, onConsent, error, onAdd,
         })}
       </section>
 
-      {/* 목록을 다 읽은 뒤에 온다. 사이에 끼우면 "예상하기 어려운 시점"으로
-          반려된다(2026-09-29). 화면당 배너는 하나만 둔다 */}
-      {notices.length > 0 && <Banner />}
-
-
-
       <footer className="dim foot">
         조달청 나라장터에 올라오는 공고를 알려드려요.
         한국전력·LH처럼 자체 조달시스템을 쓰는 곳은 따로 확인해 주세요.
       </footer>
+
+      {/* 화면의 맨 끝. 목록을 다 읽은 뒤에 온다.
+          사이에 끼우면 "예상하기 어려운 시점"으로 반려된다(2026-09-29).
+          커버리지 안내를 광고 위로 올린 것도 같은 이유다 — 광고 아래에 글이 있으면
+          광고에 딸린 설명처럼 읽힌다. 화면당 배너는 하나만 둔다 */}
+      {notices.length > 0 && <Banner />}
     </div>
   );
 }
