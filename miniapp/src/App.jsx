@@ -141,7 +141,12 @@ function Main({ conditions, notices, prespecs, consent, onConsent, error, onAdd,
     <div className="page">
       <header className="top">
         <h1>입찰레이더</h1>
-        <p className="sub">공고 뜨기 전에 미리 알려드려요</p>
+        {/* 앱 설명이 아니라 오늘 들어온 숫자를 둔다 — 이 화면이 답해야 할 질문이다 */}
+        <p className="sub">
+          {notices.length + prespecs.length > 0
+            ? `내 조건에 맞는 공고 ${notices.length}건 · 예고 ${prespecs.length}건`
+            : '아직 새로 들어온 공고가 없어요'}
+        </p>
       </header>
 
       {error && (
@@ -197,7 +202,6 @@ function Main({ conditions, notices, prespecs, consent, onConsent, error, onAdd,
               </button>
             );
           })}
-          <p className="dim pad">눌러서 끄고 켤 수 있어요. 알림은 하루 한 번 모아서 보내요.</p>
         </section>
       )}
 
@@ -211,6 +215,7 @@ function Main({ conditions, notices, prespecs, consent, onConsent, error, onAdd,
             <button
               key={p.spec_no}
               className="notice"
+              disabled={!p.doc_url}
               onClick={() => openLink(p.doc_url)}
             >
               <div className="notice-top">
@@ -220,7 +225,10 @@ function Main({ conditions, notices, prespecs, consent, onConsent, error, onAdd,
                 <span className="amt">{money(p.budget)}</span>
               </div>
               <div className="title">{p.spec_nm}</div>
-              <div className="dim">{p.order_instt}</div>
+              <div className="dim">
+                {p.order_instt}
+                {p.doc_url ? <> · <span className="go">규격서 ↗</span></> : ' · 규격서 없음'}
+              </div>
             </button>
           ))}
         </section>
@@ -239,6 +247,7 @@ function Main({ conditions, notices, prespecs, consent, onConsent, error, onAdd,
             <button
               key={n.bid_ntce_no}
               className="notice"
+              disabled={!n.detail_url}
               onClick={() => openLink(n.detail_url)}
             >
               <div className="notice-top">
@@ -249,6 +258,7 @@ function Main({ conditions, notices, prespecs, consent, onConsent, error, onAdd,
               <div className="dim">
                 {n.ntce_instt_nm}
                 {n.cntrct_mthd ? ` · ${n.cntrct_mthd}` : ''}
+                {n.detail_url ? <> · <span className="go">나라장터 ↗</span></> : ''}
               </div>
             </button>
           );

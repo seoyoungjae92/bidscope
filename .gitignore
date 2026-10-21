@@ -19,3 +19,6 @@ __pycache__/
 # 스크린샷 원본은 버전관리 대상이 아니다 (콘솔에 올리면 끝)
 shots/_sheet.png
 logo/_compare.png
+
+# 디자인 검사 산출물(스크린샷·리포트)
+.taste-skill/

@@ -3,9 +3,10 @@
 :root {
   --blue: #3182f6;          /* 액션 전용. 정보에는 쓰지 않는다 */
   --blue-weak: #e8f3ff;
+  --blue-ink: #1b64da;      /* 작은 글씨용. --blue는 흰 바탕에서 3.7:1이라 모자란다 */
   --ink: #191f28;           /* 본문 */
   --ink-2: #4e5968;         /* 보조 텍스트 */
-  --dim: #8b95a1;           /* 캡션 */
+  --dim: #5e6773;           /* 캡션. #8b95a1은 흰 바탕에서 2.7:1이라 폰에서 안 읽힌다 */
   --line: #f2f4f6;
   --bg: #fff;
   --warn: #ff8a00;          /* 마감 임박. 에러가 아니라 주의다 */
@@ -79,7 +80,7 @@ section h2 .count { color: var(--blue); }
   background: var(--line); color: var(--dim);
   font-size: 14px; font-weight: 600;
 }
-.switch.on .state { background: var(--blue-weak); color: var(--blue); }
+.switch.on .state { background: var(--blue-weak); color: var(--blue-ink); }
 .switch:disabled { opacity: .5; }
 
 /* 공고 */
@@ -96,10 +97,19 @@ section h2 .count { color: var(--blue); }
   font-size: 12px; font-weight: 600; color: var(--ink-2);
   background: var(--line); padding: 4px 8px; border-radius: 6px; flex: none;
 }
-.badge.urgent { color: #fff; background: var(--warn); }
-.badge.pre { color: #1b64da; background: #fff; }
+/* 흰 글씨를 주황 위에 얹으면 2.4:1이라 읽히지 않는다. 같은 색을 연하게 깔고
+   글씨를 진하게 — 눈에 띄는 정도는 유지하면서 대비를 7:1로 올린다 */
+.badge.urgent { color: #8a4b00; background: #ffeedb; }
+.badge.pre { color: var(--blue-ink); background: #fff; }
 /* 금액은 정보다. 파란색은 액션에만 쓴다 */
-.amt { font-size: 15px; font-weight: 700; color: var(--ink); }
+.amt {
+  font-size: 15px; font-weight: 700; color: var(--ink);
+  font-variant-numeric: tabular-nums;   /* 자릿수를 세로로 맞춘다 */
+}
+/* 누르면 앱 밖으로 나간다는 표시. 심사에서 "인지하지 못한 외부 이동"으로 걸리는 항목이다 */
+.go { color: var(--blue-ink); white-space: nowrap; }
+.notice:disabled { opacity: 1; }
+.notice:disabled .title { color: var(--ink-2); }
 .notice .title {
   font-size: 16px; font-weight: 500; line-height: 1.4; margin-bottom: 6px;
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
