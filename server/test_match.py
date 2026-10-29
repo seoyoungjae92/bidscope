@@ -321,7 +321,44 @@ def main():
     missing = sorted(a for a in used if not hasattr(push_mod, a))
     assert not missing, f"scheduler가 부르는데 push에 없는 이름: {missing}"
 
-    print(f"통과. 조건 10종 · 공고 {len(NOTICES)}건 · 큐 {n1}건 · 마감임박 6종 · 사전규격 9종 · TZ 3종 · 변수 5종 · 부팅수집 3종 · 푸시따라잡기 4종 · 스케줄러-푸시 연결")
+    # 백업: 날짜별 사본을 남기고 최근 7개만 둔다
+    import glob, sqlite3
+    src = con.execute("pragma database_list").fetchone()["file"]
+    bdir = os.path.join(os.path.dirname(src), "backup")
+    os.makedirs(bdir, exist_ok=True)
+    for i in range(8):   # 예전 날짜 사본 8개가 이미 있는 상태
+        open(os.path.join(bdir, f"{os.path.basename(src)}.2000010{i}"), "w").close()
+    dest = db.backup(con)
+    left = sorted(glob.glob(os.path.join(bdir, os.path.basename(src) + ".*")))
+    assert len(left) == 7 and left[-1] == dest, f"최근 7개만 남아야 한다: {left}"
+    assert sqlite3.connect(dest).execute("select count(*) from notice").fetchone()[0] == len(NOTICES), \
+        "백업이 실제 데이터를 담아야 한다"
+
+    # 알림: 웹훅이 없으면 로그만, 있으면 한 줄을 보낸다. 실패해도 예외를 던지지 않는다
+    import alert, urllib.request
+    os.environ.pop("ALERT_WEBHOOK_URL", None)
+    assert alert.send("테스트") is False
+    sent = []
+    real_urlopen, real_send_one = urllib.request.urlopen, push_mod.send_one
+    urllib.request.urlopen = lambda req, timeout: sent.append(json.loads(req.data)) or type("R", (), {"close": lambda s: None})()
+    os.environ["ALERT_WEBHOOK_URL"] = "http://example.invalid/hook"
+    try:
+        assert alert.send("수집 실패") is True and sent[0]["text"] == "수집 실패" == sent[0]["content"]
+        urllib.request.urlopen = lambda req, timeout: (_ for _ in ()).throw(OSError("down"))
+        assert alert.send("x") is False, "알림 전송 실패가 배치를 멈추면 안 된다"
+        # 푸시 일부 실패도 알린다
+        sent.clear()
+        urllib.request.urlopen = lambda req, timeout: sent.append(json.loads(req.data)) or type("R", (), {"close": lambda s: None})()
+        push_mod.send_one = lambda t, k, c: (False, "500")
+        push_mod.run_batch(con, "신규 공고", {1: {"toss_key": "k", "items": [], "total": 1}},
+                           lambda d: {}, "T", lambda c, s: None, True)
+        assert any("1건 실패" in m["text"] for m in sent), f"푸시 실패 알림이 없다: {sent}"
+    finally:
+        urllib.request.urlopen = real_urlopen
+        push_mod.send_one = real_send_one
+        os.environ.pop("ALERT_WEBHOOK_URL", None)
+
+    print(f"통과. 조건 10종 · 공고 {len(NOTICES)}건 · 큐 {n1}건 · 마감임박 6종 · 사전규격 9종 · TZ 3종 · 변수 5종 · 부팅수집 3종 · 푸시따라잡기 4종 · 스케줄러-푸시 연결 · 백업 · 알림")
 
 
 if __name__ == "__main__":

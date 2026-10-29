@@ -139,6 +139,29 @@ def _check(path):
     os.makedirs(d, exist_ok=True)   # 상대 경로는 로컬 개발이므로 만들어 준다
 
 
+def backup(con, keep=7):
+    """DB 사본을 날짜별로 남긴다. 03:30 스케줄러가 부른다.
+
+    공고는 API에서 다시 받으면 되지만 사용자 조건은 사라지면 복구할 수 없다.
+    vacuum into는 쓰는 중에도 일관된 사본을 만든다. 같은 볼륨 안이라 볼륨
+    자체를 잃는 건 못 막지만, 잘못된 마이그레이션이나 실수로 지운 데이터는
+    되돌릴 수 있다.
+    """
+    import glob
+    from datetime import datetime, timedelta, timezone
+    src = con.execute("pragma database_list").fetchone()["file"]
+    d = os.path.join(os.path.dirname(src), "backup")
+    os.makedirs(d, exist_ok=True)
+    day = datetime.now(timezone(timedelta(hours=9))).strftime("%Y%m%d")
+    dest = os.path.join(d, f"{os.path.basename(src)}.{day}")
+    if os.path.exists(dest):
+        os.remove(dest)  # vacuum into는 이미 있는 파일에 쓰지 않는다
+    con.execute("vacuum into ?", (dest,))
+    for old in sorted(glob.glob(os.path.join(d, os.path.basename(src) + ".*")))[:-keep]:
+        os.remove(old)
+    return dest
+
+
 def connect(path=None):
     path = path or DB_PATH
     _check(path)

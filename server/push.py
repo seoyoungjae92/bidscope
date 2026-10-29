@@ -19,6 +19,7 @@ import os
 import ssl
 import sys
 
+import alert
 import db
 import g2b
 
@@ -163,6 +164,8 @@ def run_batch(con, label, digests, make_vars, template, mark, send):
     if send and sent:
         mark(con, sent)
         print(f"  발송 {len(sent)} · 실패 {failed}")
+    if send and failed:
+        alert.send(f"[bidscope] {label} 푸시 {failed}건 실패 (성공 {len(sent)}건)")
     return len(digests)
 
 

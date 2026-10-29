@@ -10,11 +10,16 @@ Railway 볼륨은 서비스당 하나라서 크론을 별도 서비스로 빼면
     09:00 / 13:00 / 18:00   수집 + 매칭
     09:10                   공고 예고 + 신규 공고 푸시
     15:00                   마감 임박 푸시
+    03:30                   DB 백업 (최근 7일치)
+
+실패하면 ALERT_WEBHOOK_URL로 알린다(alert.py).
 """
 import os
 import threading
 import time
 import traceback
+
+import alert
 from datetime import datetime, timedelta, timezone
 
 KST = timezone(timedelta(hours=9))
@@ -26,6 +31,7 @@ JOBS = [
     (13, 0, "collect"),
     (15, 0, "push_closing"),
     (18, 0, "collect"),
+    (3, 30, "backup"),
 ]
 
 
@@ -60,8 +66,16 @@ def _run(name):
             push.run_batch(con, "마감 임박", g2b.closing_digest(con),
                            push.vars_closing, push.TEMPLATE_CLOSING,
                            g2b.mark_closing_sent, send)
+        elif name == "backup":
+            print(f"[scheduler] 백업 {db.backup(con)}")
     finally:
         con.close()
+
+
+def _fail(name):
+    traceback.print_exc()
+    last = traceback.format_exc().strip().splitlines()[-1]
+    alert.send(f"[bidscope] {name} 실패: {last}")
 
 
 def _next_at(now, hh, mm):
@@ -103,7 +117,7 @@ def _catch_up():
     try:
         _run("collect")
     except Exception:
-        traceback.print_exc()
+        _fail("collect")
 
 
 def _push_catch_up():
@@ -131,7 +145,7 @@ def _push_catch_up():
     try:
         _run("push")
     except Exception:
-        traceback.print_exc()
+        _fail("push")
 
 
 def _loop():
@@ -149,7 +163,7 @@ def _loop():
             _run(name)
         except Exception:
             # 한 번 실패해도 스케줄러는 살아있어야 한다
-            traceback.print_exc()
+            _fail(name)
         time.sleep(61)   # 같은 분에 두 번 트리거되는 것 방지
 
 
